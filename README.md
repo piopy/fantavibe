@@ -1,70 +1,140 @@
-# Getting Started with Create React App
+# 🚀 Fantavibe - Fantacalcio Assistant
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+[![Netlify Status](https://api.netlify.com/api/v1/badges/d9c9ea9a-5574-4489-a836-e3476e571d62/deploy-status)](https://app.netlify.com/projects/fantavibe/deploys)
 
-## Available Scripts
+Allora, intanto ciao, qua sono io che scrivo ed é giusto fare le dovute premesse. Sta roba qua é frutto di un paio di sere di vibe coding tra me e Claude :wink: quindi prendete tutto per come sta senza troppe aspettative.
 
-In the project directory, you can run:
+I dati per far vedere le magie li prendo qui: <https://github.com/piopy/fantacalcio-py> (bravi ragazzi, salutano sempre).
+Al momento sono dati belli scolpiti dentro ad un file in `public/` ma se mai dovesse girarmi metto su un servizio per recuperare i dati in qualche altro modo, chi lo sa.
 
-### `npm start`
+Se volete l'ho tirata su in Netlify qui: https://fantavibe.netlify.app/
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Adesso vi lascio ai trip mentali dello zio Claude che chissá cosa si sará fumato prima di scrivere sto README.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## ✨ Cosa fa Fantavibe
 
-### `npm test`
+Fantavibe è il tuo assistente personale per il fantacalcio che ti permette di:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 🎯 **Gestione Rosa Intelligente**
 
-### `npm run build`
+- **Ricerca avanzata** dei giocatori con filtri per ruolo e nome
+- **Visualizzazione classifiche** complete con statistiche dettagliate
+- **Gestione stati** giocatori (disponibile, acquistato, non disponibile)
+- **Tracking automatico** degli acquisti con timestamp
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 💰 **Budget Manager**
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- **Controllo budget** in tempo reale con fantamilioni disponibili
+- **Validazione acquisti** automatica per evitare sforamenti
+- **Statistiche spesa** per ruolo e giocatore
+- **Calcolo budget rimanente** dinamico
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### 📊 **Analytics & Insights**
 
-### `npm run eject`
+- **Dashboard rosa** con giocatori acquistati organizzati per ruolo
+- **Statistiche complete** su spesa, giocatori per ruolo, media acquisti
+- **Indicatori visivi** per budget e disponibilità
+- **Esportazione dati** per backup e condivisione
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### 🎨 **UI/UX Moderna**
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- **Design responsive** ottimizzato per desktop e mobile
+- **Interfaccia intuitiva** con navigazione a tab
+- **Feedback visivi** per tutte le azioni utente
+- **Persistenza dati** automatica con localStorage
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Stack Tecnologico
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```text
+Frontend Framework: React 19.1.1
+Styling: Inline Styles
+Data Processing: XLSX per parsing file Excel
+Storage: LocalStorage per persistenza client-side
+State Management: React Hooks (useState, useEffect, useMemo)
+Search: Algoritmo di ricerca fuzzy custom
+Build Tool: Create React App
+```
 
-## Learn More
+## 🚀 Quick Start
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Installazione
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```bash
+# Clona il repository
+git clone [repository-url]
 
-### Code Splitting
+# Installa le dipendenze
+npm install
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+# Avvia l'ambiente di sviluppo
+npm start
+```
 
-### Analyzing the Bundle Size
+### Utilizzo
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+1. **Carica i dati**: L'app cerca automaticamente `fpedia_analysis.xlsx` nella cartella `public/`
+2. **Imposta budget**: Modifica il budget iniziale (default 500 FM)
+3. **Esplora giocatori**: Usa la ricerca per trovare i giocatori desiderati
+4. **Costruisci la rosa**: Acquista giocatori specificando i fantamilioni
+5. **Monitora budget**: Tieni traccia delle spese in tempo reale
 
-### Making a Progressive Web App
+## 🔧 Configurazione
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### File Dati
 
-### Advanced Configuration
+Posiziona il file Excel con i dati dei giocatori in:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+```
+public/fpedia_analysis.xlsx
+```
 
-### Deployment
+Il file deve contenere colonne:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+- `Nome` - Nome del giocatore
+- `Ruolo` - Ruolo (POR, DIF, CEN, ATT)
+- `Squadra` - Squadra di appartenenza
+- Altre statistiche opzionali
 
-### `npm run build` fails to minify
+### Personalizzazione Budget
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Il budget iniziale è 500 FM, modificabile dall'interfaccia e salvato automaticamente.
+
+## 🎮 Funzionalità Avanzate
+
+### Ricerca Intelligente
+
+- **Ricerca fuzzy** per trovare giocatori anche con errori di digitazione
+- **Filtri ruolo** per navigazione rapida
+- **Indicatori rank** per posizionamento in classifica
+- **Modalità dettagli** per statistiche complete
+
+### Gestione Rosa
+
+- **Organizzazione per ruolo** automatica
+- **Ordinamento per spesa** decrescente
+- **Rimozione giocatori** con conferma
+- **Calcolo automatico** totali e medie
+
+### Persistenza Dati
+
+- **Salvataggio automatico** di tutti gli acquisti
+- **Migrazione dati** automatica tra versioni
+- **Esportazione JSON** per backup
+- **Reset completo** con conferma
+
+## 🤝 Contribuire
+
+Fantavibe è un progetto in continua evoluzione. I contributi sono benvenuti, purché rispettino la filosofia di semplicità e intuizione.
+
+### Come Contribuire
+
+1. Studia il flusso utente esistente
+2. Proponi miglioramenti che seguano l'intuizione naturale
+3. Mantieni il codice semplice e leggibile
+4. Testa l'impatto sull'esperienza utente
+
+---
+
+**Sviluppato con ❤️ e Claude**
+
+*"Il miglior codice è quello che non si nota, che fluisce naturalmente come il pensiero dell'utente"*
