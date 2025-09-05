@@ -8,7 +8,7 @@ const STORAGE_KEY_LAST_FILE = 'fantavibe_last_file_info';
 export const getFileInfo = async () => {
   try {
     // Facciamo una richiesta HEAD per ottenere solo gli headers
-    const response = await fetch(process.env.DIRECT_FILE_URL, {
+    const response = await fetch(process.env.REACT_APP_DIRECT_FILE_URL, {
       method: 'HEAD',
       headers: {
         'User-Agent': 'FantaVibe-App'
@@ -88,7 +88,7 @@ export const hasFileChanged = (currentFileInfo, storedFileInfo) => {
  */
 export const downloadDatasetFromGitHub = async () => {
   try {
-    console.log('Scaricando direttamente da:', process.env.DIRECT_FILE_URL);
+    console.log('Scaricando direttamente da:', process.env.REACT_APP_DIRECT_FILE_URL);
         
     const response = await fetch("/.netlify/functions/download-data");
     
@@ -169,7 +169,7 @@ export const getLatestReleaseInfo = async () => {
     tagName: `File diretto ${fileInfo.timestamp}`,
     publishedAt: fileInfo.lastModified || fileInfo.timestamp,
     id: fileInfo.etag || fileInfo.contentLength || Date.now(),
-    downloadUrl: process.env.DIRECT_FILE_URL
+    downloadUrl: process.env.REACT_APP_DIRECT_FILE_URL
   };
 };
 

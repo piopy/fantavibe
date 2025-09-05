@@ -1,7 +1,7 @@
 import fetch from "node-fetch";
 
 export async function handler(event, context) {
-  const url = process.env.DIRECT_FILE_URL || "";
+  const url = process.env.REACT_APP_DIRECT_FILE_URL || "";
   
   console.log('Fetching from URL:', url);
 
