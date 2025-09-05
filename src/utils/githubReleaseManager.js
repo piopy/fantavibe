@@ -1,102 +1,122 @@
 // utils/githubReleaseManager.js
 
-const GITHUB_API_URL = 'https://api.github.com/repos/informagico/fantavibe-dataset/releases/latest';
-const STORAGE_KEY_LAST_RELEASE = 'fantavibe_last_release_info';
+const DIRECT_FILE_URL = 'https://github.com/informagico/fantavibe-dataset/blob/release/latest_fpedia_analysis.xlsx?raw=true';
+const STORAGE_KEY_LAST_FILE = 'fantavibe_last_file_info';
 
 /**
- * Ottiene informazioni sull'ultima release dal repository GitHub
+ * Ottiene l'ETag o altre info di cache del file diretto
  */
-export const getLatestReleaseInfo = async () => {
+export const getFileInfo = async () => {
   try {
-    const response = await fetch(GITHUB_API_URL);
-    if (!response.ok) {
-      throw new Error(`GitHub API error: ${response.status}`);
-    }
-    
-    const releaseData = await response.json();
-    
-    // Trova il file Excel tra gli assets
-    const excelAsset = releaseData.assets.find(asset => 
-      asset.name === 'fpedia_analysis.xlsx'
-    );
-    
-    if (!excelAsset) {
-      throw new Error('File fpedia_analysis.xlsx non trovato negli assets della release');
-    }
-    
-    return {
-      tagName: releaseData.tag_name,
-      publishedAt: releaseData.published_at,
-      id: releaseData.id,
-      // URL diretto di download da GitHub
-      downloadUrl: excelAsset.browser_download_url
-    };
-  } catch (error) {
-    console.error('Errore nel recupero delle informazioni sulla release:', error);
-    throw error;
-  }
-};
-
-/**
- * Carica l'informazione sulla release salvata localmente
- */
-export const getStoredReleaseInfo = () => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY_LAST_RELEASE);
-    return stored ? JSON.parse(stored) : null;
-  } catch (error) {
-    console.error('Errore nel caricamento delle info release salvate:', error);
-    return null;
-  }
-};
-
-/**
- * Salva l'informazione sulla release localmente
- */
-export const saveReleaseInfo = (releaseInfo) => {
-  try {
-    localStorage.setItem(STORAGE_KEY_LAST_RELEASE, JSON.stringify({
-      ...releaseInfo,
-      lastChecked: new Date().toISOString()
-    }));
-  } catch (error) {
-    console.error('Errore nel salvataggio delle info release:', error);
-  }
-};
-
-/**
- * Controlla se c'è una nuova release disponibile
- */
-export const hasNewRelease = (currentRelease, storedRelease) => {
-  if (!storedRelease) return true;
-  return currentRelease.id !== storedRelease.id;
-};
-
-/**
- * Scarica il dataset direttamente da GitHub
- */
-export const downloadDatasetFromGitHub = async (githubUrl) => {
-  try {
-    console.log('Scaricando direttamente da GitHub:', githubUrl);
-    
-    const response = await fetch(githubUrl, {
-      method: 'GET',
+    // Facciamo una richiesta HEAD per ottenere solo gli headers
+    const response = await fetch(DIRECT_FILE_URL, {
+      method: 'HEAD',
       headers: {
-        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        // Aggiungi User-Agent per evitare eventuali blocchi
         'User-Agent': 'FantaVibe-App'
       }
     });
     
     if (!response.ok) {
-      throw new Error(`GitHub download failed: ${response.status} ${response.statusText}`);
+      throw new Error(`File check error: ${response.status}`);
+    }
+    
+    return {
+      etag: response.headers.get('etag') || response.headers.get('ETag'),
+      lastModified: response.headers.get('last-modified') || response.headers.get('Last-Modified'),
+      contentLength: response.headers.get('content-length') || response.headers.get('Content-Length'),
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Errore nel controllo del file:', error);
+    throw error;
+  }
+};
+
+/**
+ * Carica l'informazione sul file salvata localmente
+ */
+export const getStoredFileInfo = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_LAST_FILE);
+    return stored ? JSON.parse(stored) : null;
+  } catch (error) {
+    console.error('Errore nel caricamento delle info file salvate:', error);
+    return null;
+  }
+};
+
+/**
+ * Salva l'informazione sul file localmente
+ */
+export const saveFileInfo = (fileInfo) => {
+  try {
+    localStorage.setItem(STORAGE_KEY_LAST_FILE, JSON.stringify({
+      ...fileInfo,
+      lastChecked: new Date().toISOString()
+    }));
+  } catch (error) {
+    console.error('Errore nel salvataggio delle info file:', error);
+  }
+};
+
+/**
+ * Controlla se il file è cambiato rispetto a quello salvato
+ */
+export const hasFileChanged = (currentFileInfo, storedFileInfo) => {
+  if (!storedFileInfo) return true;
+  
+  // Controlla prima l'ETag (più affidabile)
+  if (currentFileInfo.etag && storedFileInfo.etag) {
+    return currentFileInfo.etag !== storedFileInfo.etag;
+  }
+  
+  // Fallback su Last-Modified
+  if (currentFileInfo.lastModified && storedFileInfo.lastModified) {
+    return currentFileInfo.lastModified !== storedFileInfo.lastModified;
+  }
+  
+  // Fallback su Content-Length
+  if (currentFileInfo.contentLength && storedFileInfo.contentLength) {
+    return currentFileInfo.contentLength !== storedFileInfo.contentLength;
+  }
+  
+  // Se non abbiamo info sufficienti, considera cambiato
+  return true;
+};
+
+/**
+ * Scarica il dataset direttamente dall'URL specificato
+ */
+export const downloadDatasetFromGitHub = async () => {
+  try {
+    console.log('Scaricando direttamente da:', DIRECT_FILE_URL);
+    
+    const response = await fetch(DIRECT_FILE_URL, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'User-Agent': 'FantaVibe-App'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
     }
     
     const arrayBuffer = await response.arrayBuffer();
-    console.log('✅ Download GitHub riuscito:', arrayBuffer.byteLength, 'bytes');
-    return arrayBuffer;
+    console.log('✅ Download riuscito:', arrayBuffer.byteLength, 'bytes');
+    
+    // Ottieni anche le info del file dalla risposta
+    const fileInfo = {
+      etag: response.headers.get('etag') || response.headers.get('ETag'),
+      lastModified: response.headers.get('last-modified') || response.headers.get('Last-Modified'),
+      contentLength: response.headers.get('content-length') || response.headers.get('Content-Length'),
+      timestamp: new Date().toISOString()
+    };
+    
+    return { arrayBuffer, fileInfo };
   } catch (error) {
-    console.error('Errore download GitHub:', error);
+    console.error('Errore download diretto:', error);
     throw error;
   }
 };
@@ -106,37 +126,39 @@ export const downloadDatasetFromGitHub = async (githubUrl) => {
  */
 export const checkAndUpdateDataset = async () => {
   try {
-    console.log('Controllo aggiornamenti...');
+    console.log('Controllo se il file è cambiato...');
     
-    // 1. Ottieni info release
-    const latestRelease = await getLatestReleaseInfo();
+    // 1. Ottieni info file corrente
+    const currentFileInfo = await getFileInfo();
     
     // 2. Controlla se serve aggiornare
-    const storedRelease = getStoredReleaseInfo();
-    const needsUpdate = hasNewRelease(latestRelease, storedRelease);
+    const storedFileInfo = getStoredFileInfo();
+    const needsUpdate = hasFileChanged(currentFileInfo, storedFileInfo);
     
-    console.log('Release corrente:', latestRelease.tagName);
-    console.log('Release salvata:', storedRelease?.tagName || 'Nessuna');
+    console.log('Info file corrente:', currentFileInfo);
+    console.log('Info file salvato:', storedFileInfo);
     console.log('Aggiornamento necessario:', needsUpdate);
-    console.log('URL download:', latestRelease.downloadUrl);
     
     if (needsUpdate) {
-      // Scarica direttamente da GitHub
-      const datasetBuffer = await downloadDatasetFromGitHub(latestRelease.downloadUrl);
+      console.log('File cambiato, scarico la nuova versione...');
       
-      // Salva info release
-      saveReleaseInfo(latestRelease);
+      // Scarica direttamente
+      const { arrayBuffer, fileInfo } = await downloadDatasetFromGitHub();
+      
+      // Salva info file
+      saveFileInfo(fileInfo);
       
       return {
-        datasetBuffer,
+        datasetBuffer: arrayBuffer,
         wasUpdated: true,
-        releaseInfo: latestRelease
+        fileInfo: fileInfo
       };
     } else {
+      console.log('File non cambiato, uso quello in cache locale');
       return {
         datasetBuffer: null,
         wasUpdated: false,
-        releaseInfo: latestRelease
+        fileInfo: currentFileInfo
       };
     }
     
@@ -145,3 +167,18 @@ export const checkAndUpdateDataset = async () => {
     throw error;
   }
 };
+
+// Manteniamo compatibilità con le funzioni esistenti per non rompere il codice
+export const getLatestReleaseInfo = async () => {
+  const fileInfo = await getFileInfo();
+  return {
+    tagName: `File diretto ${fileInfo.timestamp}`,
+    publishedAt: fileInfo.lastModified || fileInfo.timestamp,
+    id: fileInfo.etag || fileInfo.contentLength || Date.now(),
+    downloadUrl: DIRECT_FILE_URL
+  };
+};
+
+export const getStoredReleaseInfo = getStoredFileInfo;
+export const saveReleaseInfo = saveFileInfo;
+export const hasNewRelease = hasFileChanged;
