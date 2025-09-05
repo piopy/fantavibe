@@ -1,6 +1,5 @@
 // utils/githubReleaseManager.js
 
-const DIRECT_FILE_URL = 'https://github.com/informagico/fantavibe-dataset/blob/release/latest_fpedia_analysis.xlsx?raw=true';
 const STORAGE_KEY_LAST_FILE = 'fantavibe_last_file_info';
 
 /**
@@ -9,7 +8,7 @@ const STORAGE_KEY_LAST_FILE = 'fantavibe_last_file_info';
 export const getFileInfo = async () => {
   try {
     // Facciamo una richiesta HEAD per ottenere solo gli headers
-    const response = await fetch(DIRECT_FILE_URL, {
+    const response = await fetch(process.env.DIRECT_FILE_URL, {
       method: 'HEAD',
       headers: {
         'User-Agent': 'FantaVibe-App'
@@ -169,7 +168,7 @@ export const getLatestReleaseInfo = async () => {
     tagName: `File diretto ${fileInfo.timestamp}`,
     publishedAt: fileInfo.lastModified || fileInfo.timestamp,
     id: fileInfo.etag || fileInfo.contentLength || Date.now(),
-    downloadUrl: DIRECT_FILE_URL
+    downloadUrl: process.env.DIRECT_FILE_URL
   };
 };
 
