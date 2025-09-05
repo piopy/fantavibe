@@ -1,23 +1,76 @@
-import fetch from "node-fetch";
-
 export async function handler(event, context) {
   const url = process.env.REACT_APP_DIRECT_FILE_URL || "";
   
   console.log('Fetching from URL:', url);
 
-  try {
-    const response = await fetch(url, {
-      method: "GET",
+  if (!url) {
+    return {
+      statusCode: 500,
       headers: {
-        "User-Agent": "FantaVibe-App",
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
       },
-    });
+      body: JSON.stringify({ 
+        error: "DIRECT_FILE_URL environment variable not configured" 
+      }),
+    };
+  }
+
+  try {
+    // Use built-in fetch if available (Node.js 18+)
+    let response;
+    
+    if (typeof fetch !== 'undefined') {
+      // Use built-in fetch
+      response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "User-Agent": "FantaVibe-App",
+        },
+      });
+    } else {
+      // Fallback to https module for older Node.js versions
+      const https = await import('https');
+      const { URL } = await import('url');
+      
+      const urlObj = new URL(url);
+      
+      response = await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: urlObj.hostname,
+          path: urlObj.pathname + urlObj.search,
+          method: 'GET',
+          headers: {
+            'User-Agent': 'FantaVibe-App'
+          }
+        }, (res) => {
+          let data = [];
+          
+          res.on('data', chunk => data.push(chunk));
+          res.on('end', () => {
+            const buffer = Buffer.concat(data);
+            resolve({
+              ok: res.statusCode >= 200 && res.statusCode < 300,
+              status: res.statusCode,
+              statusText: res.statusMessage,
+              headers: {
+                get: (name) => res.headers[name.toLowerCase()],
+                entries: () => Object.entries(res.headers)
+              },
+              buffer: () => Promise.resolve(buffer)
+            });
+          });
+        });
+        
+        req.on('error', reject);
+        req.end();
+      });
+    }
 
     console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText || 'Request failed'}`);
     }
 
     // Check content type
@@ -42,7 +95,15 @@ export async function handler(event, context) {
     }
 
     // Get the binary data as buffer
-    const buffer = await response.arrayBuffer();
+    let buffer;
+    if (response.buffer) {
+      buffer = await response.buffer();
+    } else {
+      // For built-in fetch
+      const arrayBuffer = await response.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+    }
+    
     console.log('Downloaded buffer size:', buffer.length, 'bytes');
 
     // Forward important headers
