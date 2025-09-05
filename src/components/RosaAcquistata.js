@@ -1,6 +1,6 @@
 // src/components/RosaAcquistata.js
-import React, { useMemo } from 'react';
-import { getAcquiredPlayers, getPlayerStatsByRole, getTotalFantamilioni } from '../utils/storage';
+import { useMemo } from 'react';
+import { getAcquiredPlayers } from '../utils/storage';
 
 const RosaAcquistata = ({ 
   players = [],
@@ -53,7 +53,6 @@ const RosaAcquistata = ({
   }, [acquiredPlayersDetails]);
 
   // Statistiche totali
-  const totalFantamilioni = getTotalFantamilioni(playerStatus);
   const totalPlayers = acquiredPlayersDetails.length;
 
   // Gestori eventi

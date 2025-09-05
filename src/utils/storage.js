@@ -134,32 +134,6 @@ export const getTotalFantamilioni = (playerStatus) => {
   return acquired.reduce((total, player) => total + (player.fantamilioni || 0), 0);
 };
 
-/**
- * Ottiene statistiche sui giocatori per ruolo
- * @param {Object} playerStatus - Stato di tutti i giocatori
- * @param {Array} playersData - Dati completi dei giocatori
- * @returns {Object} Statistiche per ruolo
- */
-export const getPlayerStatsByRole = (playerStatus, playersData) => {
-  const acquired = getAcquiredPlayers(playerStatus);
-  const stats = {
-    POR: { count: 0, total: 0 },
-    DIF: { count: 0, total: 0 },
-    CEN: { count: 0, total: 0 },
-    ATT: { count: 0, total: 0 }
-  };
-  
-  acquired.forEach(acquiredPlayer => {
-    const playerData = playersData.find(p => p.id === acquiredPlayer.playerId);
-    if (playerData && stats[playerData.Ruolo]) {
-      stats[playerData.Ruolo].count++;
-      stats[playerData.Ruolo].total += acquiredPlayer.fantamilioni || 0;
-    }
-  });
-  
-  return stats;
-};
-
 // ============== NUOVE FUNZIONI BUDGET ==============
 
 /**

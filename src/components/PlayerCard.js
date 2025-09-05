@@ -65,14 +65,6 @@ const PlayerCard = ({
     }
   }
 
-  function getStatusColor(status) {
-    switch (status) {
-      case 'acquired': return '#10b981';
-      case 'unavailable': return '#ef4444';
-      default: return 'transparent';
-    }
-  }
-
   // Statistiche base (sempre visibili)
   const baseStats = [
     { key: 'convenienza', label: 'Convenienza', value: player.convenienza?.toFixed(1) || 'N/A' },
