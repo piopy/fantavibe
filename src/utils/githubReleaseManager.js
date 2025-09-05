@@ -140,7 +140,7 @@ export const checkAndUpdateDataset = async () => {
       const { arrayBuffer, fileInfo } = await downloadDatasetFromGitHub();
       
       // Salva info file
-      //saveFileInfo(fileInfo);
+      saveFileInfo(fileInfo);
       
       return {
         datasetBuffer: arrayBuffer,
