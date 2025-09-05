@@ -1,4 +1,3 @@
-// App.js - Fixed version
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import FantamilioniModal from './components/FantamilioniModal';
@@ -6,8 +5,10 @@ import Header from './components/Header';
 import PlayersTab from './components/PlayersTab';
 import RosaAcquistata from './components/RosaAcquistata';
 import { normalizePlayerData } from './utils/dataUtils';
-import { checkAndUpdateDataset, downloadDatasetFromGitHub } from './utils/githubReleaseManager';
-import { getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
+import { canAffordPlayer, getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
+
+// AGGIUNGIAMO L'IMPORT PER IL DOWNLOAD (necessario per il fix)
+import { downloadDatasetFromGitHub } from './utils/githubReleaseManager';
 
 const App = () => {
   // Stati principali
@@ -27,267 +28,241 @@ const App = () => {
   const [showFantamilioniModal, setShowFantamilioniModal] = useState(false);
   const [playerToAcquire, setPlayerToAcquire] = useState(null);
 
-  // Stati per il monitoraggio aggiornamenti
-  const [updateStatus, setUpdateStatus] = useState({
-    isChecking: false,
-    lastUpdate: null,
-    currentVersion: null,
-    error: null
-  });
-
   // Carica status giocatori all'avvio
   useEffect(() => {
     const status = loadPlayerStatus();
     const savedBudget = loadBudget();
     
-    console.log('Caricamento status iniziale:', Object.keys(status).length, 'giocatori');
-    console.log('Budget salvato:', savedBudget);
+    console.log('Caricamento iniziale - Stato trovato:', Object.keys(status).length, 'giocatori');
+    console.log('Caricamento iniziale - Budget trovato:', savedBudget);
     
     setPlayerStatus(status);
     setBudget(savedBudget);
+    
+    // Segna come inizializzato DOPO aver caricato i dati
     setIsInitialized(true);
     
-    // Carica i dati all'avvio
-    loadData();
+    loadDataFromPublic();
   }, []);
 
-  // Salva dati quando cambiano (solo dopo inizializzazione)
+  // Salva automaticamente lo status dei giocatori
   useEffect(() => {
-    if (isInitialized) {
-      savePlayerStatus(playerStatus);
-      console.log('Status giocatori salvato:', Object.keys(playerStatus).length, 'giocatori');
+    // Non salvare durante l'inizializzazione
+    if (!isInitialized) {
+      console.log('Salvataggio saltato - app non ancora inizializzata');
+      return;
     }
+    
+    console.log('Salvando stato giocatori:', Object.keys(playerStatus).length, 'giocatori');
+    savePlayerStatus(playerStatus);
   }, [playerStatus, isInitialized]);
 
+  // Salva automaticamente il budget
   useEffect(() => {
-    if (isInitialized) {
-      saveBudget(budget);
-      console.log('Budget salvato:', budget);
+    // Non salvare durante l'inizializzazione
+    if (!isInitialized) {
+      console.log('Salvataggio budget saltato - app non ancora inizializzata');
+      return;
     }
+    
+    console.log('Salvando budget:', budget);
+    saveBudget(budget);
   }, [budget, isInitialized]);
 
-  // Funzione per caricare i dati
-  const loadData = async () => {
+  // Caricamento automatico del file - CON FIX PER DOWNLOAD
+  const loadDataFromPublic = async () => {
     setLoading(true);
     setError(null);
-    setUpdateStatus(prev => ({ ...prev, isChecking: true, error: null }));
-
+    
     try {
-      console.log('🚀 Inizio caricamento dati...');
-      
-      // Prima verifica se ci sono aggiornamenti
-      const updateResult = await checkAndUpdateDataset();
-      
-      setUpdateStatus(prev => ({
-        ...prev,
-        lastUpdate: updateResult.lastUpdate,
-        currentVersion: updateResult.currentVersion,
-        isChecking: false
-      }));
-
-      // Poi carica i dati (da file locale o scaricato)
-      let data;
-      
+      // TENTATIVO 1: Prova a scaricare da GitHub
       try {
-        // Prova prima a scaricare l'ultima versione
-        data = await downloadDatasetFromGitHub();
-        console.log('✅ Dati scaricati da GitHub, giocatori trovati:', data?.length || 0);
-      } catch (downloadError) {
-        console.warn('⚠️ Fallback a file locale:', downloadError.message);
-        
-        // Fallback: carica file locale
-        const response = await fetch('/fpedia_analysis.xlsx');
-        if (!response.ok) throw new Error('File locale non trovato');
-        
-        const arrayBuffer = await response.arrayBuffer();
+        console.log('🚀 Tentando download da GitHub...');
+        const downloadResult = await downloadDatasetFromGitHub();
+        const arrayBuffer = downloadResult.arrayBuffer; // FIX: estrai arrayBuffer dall'oggetto
         const workbook = XLSX.read(arrayBuffer);
         const sheetName = workbook.SheetNames[0];
-        data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-        console.log('📁 Dati caricati da file locale, giocatori:', data?.length || 0);
+        const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        
+        console.log('✅ Dati scaricati da GitHub, giocatori trovati:', data?.length || 0);
+        setFpediaData(data);
+        return; // Successo, esci dalla funzione
+      } catch (downloadError) {
+        console.warn('⚠️ Download da GitHub fallito, provo file locale:', downloadError.message);
       }
 
-      if (!data || data.length === 0) {
-        throw new Error('Nessun dato trovato nel file');
+      // TENTATIVO 2: Fallback al file locale
+      console.log('📁 Caricando file locale...');
+      const fpediaResponse = await fetch('/fpedia_analysis.xlsx');
+      if (fpediaResponse.ok) {
+        const fpediaBuffer = await fpediaResponse.arrayBuffer();
+        const fpediaWorkbook = XLSX.read(fpediaBuffer);
+        const fpediaSheet = fpediaWorkbook.Sheets[fpediaWorkbook.SheetNames[0]];
+        const fpediaJson = XLSX.utils.sheet_to_json(fpediaSheet);
+        
+        console.log('✅ Dati caricati da file locale, giocatori:', fpediaJson?.length || 0);
+        setFpediaData(fpediaJson);
+      } else {
+        setError('File fpedia_analysis.xlsx non trovato nella cartella public. Verifica che il file sia presente.');
       }
-
-      setFpediaData(data);
-      console.log('✅ Caricamento completato con successo');
-
-    } catch (error) {
-      console.error('❌ Errore nel caricamento dati:', error);
-      setError(`Errore nel caricamento: ${error.message}`);
-      setUpdateStatus(prev => ({
-        ...prev,
-        isChecking: false,
-        error: error.message
-      }));
+    } catch (err) {
+      setError('Errore nel caricamento del file. Controlla la console per maggiori dettagli.');
+      console.error('Errore caricamento automatico:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Funzione per forzare l'aggiornamento
-  const forceUpdate = () => {
-    loadData();
-  };
-
-  // Normalizza i dati per l'utilizzo nell'app
-  const normalizedDataResult = useMemo(() => {
-    if (!fpediaData || fpediaData.length === 0) return { players: [], searchIndex: new Map() };
+  // Normalizza i dati e crea indice di ricerca
+  const normalizedDataWithIndex = useMemo(() => {
+    if (!fpediaData.length) return { players: [], searchIndex: null };
     return normalizePlayerData(fpediaData);
   }, [fpediaData]);
 
-  // Estrai players e searchIndex dal risultato
-  const normalizedData = normalizedDataResult.players || [];
-  const searchIndexFromNormalization = normalizedDataResult.searchIndex || new Map();
+  const normalizedData = normalizedDataWithIndex.players;
+  const searchIndex = normalizedDataWithIndex.searchIndex;
 
-  // Crea indice di ricerca per componenti legacy (se necessario)
-  const searchIndex = useMemo(() => {
-    if (!normalizedData || normalizedData.length === 0) return [];
-    
-    return normalizedData.map((player, index) => ({
-      ...player,
-      originalIndex: index,
-      searchableText: [
-        player.Nome, // Corretto: usa Nome con maiuscola
-        player.Ruolo,
-        player.Squadra,
-        // Aggiungi altri campi ricercabili se necessario
-      ].filter(Boolean).join(' ').toLowerCase()
-    }));
-  }, [normalizedData]);
-
-  // Handler per cambiare tab
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
+  // Gestione status giocatori
+  const handlePlayerStatusChange = (playerId, status, fantamilioni = null) => {
+    console.log('Cambiamento stato giocatore:', playerId, status, fantamilioni);
+    const newStatus = updatePlayerStatus(playerStatus, playerId, status, fantamilioni);
+    setPlayerStatus(newStatus);
   };
 
-  // Handler per cambiare status giocatore
-  const handlePlayerStatusChange = (playerId, status) => {
-    setPlayerStatus(prev => updatePlayerStatus(prev, playerId, status));
-  };
-
-  // Handler per acquisire giocatore (apre modal)
+  // Gestione acquisto giocatore con fantamilioni
   const handlePlayerAcquire = (player) => {
     setPlayerToAcquire(player);
     setShowFantamilioniModal(true);
   };
 
-  // Handler per conferma fantamilioni
   const handleFantamilioniConfirm = (fantamilioni) => {
     if (playerToAcquire) {
-      const totalSpent = getTotalFantamilioni(playerStatus);
-      const newTotal = totalSpent + fantamilioni;
-      
-      if (newTotal > budget) {
-        alert(`Budget insufficiente! Hai ${budget - totalSpent} FM disponibili.`);
+      // Controllo budget
+      if (!canAffordPlayer(fantamilioni, budget, playerStatus)) {
+        alert(`Non hai abbastanza fantamilioni! Budget rimanente: ${budget - getTotalFantamilioni(playerStatus)} FM`);
         return;
       }
-
-      setPlayerStatus(prev => updatePlayerStatus(prev, playerToAcquire.id, 'acquired', fantamilioni));
+      
+      handlePlayerStatusChange(playerToAcquire.id, 'acquired', fantamilioni);
       setShowFantamilioniModal(false);
       setPlayerToAcquire(null);
     }
   };
 
-  // Handler per rimuovere giocatore dalla rosa
-  const handlePlayerRemove = (playerId) => {
-    setPlayerStatus(prev => {
-      const newStatus = { ...prev };
-      delete newStatus[playerId];
-      return newStatus;
-    });
+  const handleFantamilioniCancel = () => {
+    setShowFantamilioniModal(false);
+    setPlayerToAcquire(null);
   };
 
-  // Handler per modificare fantamilioni
-  const handleEditFantamilioni = (playerId, newFantamilioni) => {
-    setPlayerStatus(prev => updatePlayerStatus(prev, playerId, 'acquired', newFantamilioni));
+  // Tab configuration
+  const tabs = [
+    { 
+      id: 'giocatori', 
+      label: 'Giocatori', 
+      emoji: '👤',
+      description: 'Cerca e visualizza tutti i giocatori con statistiche e classifiche'
+    },
+    { 
+      id: 'rosa', 
+      label: 'La Mia Rosa', 
+      emoji: '⭐',
+      description: 'Visualizza i giocatori che hai acquistato e gestisci il budget'
+    }
+  ];
+
+  // Stili
+  const containerStyle = {
+    minHeight: '100vh',
+    backgroundColor: '#f8fafc'
   };
 
-  // Handler per cambiare budget
-  const handleBudgetChange = (newBudget) => {
-    setBudget(newBudget);
-  };
-
-  // Stili per la navigazione tab
-  const tabNavigationStyle = {
+  const tabsContainerStyle = {
     display: 'flex',
+    justifyContent: 'center',
+    padding: '0 1rem',
     backgroundColor: 'white',
-    borderBottom: '1px solid #e2e8f0',
-    marginBottom: '1rem'
+    borderBottom: '1px solid #e2e8f0'
   };
 
-  const tabButtonStyle = (isActive) => ({
-    flex: 1,
-    padding: '0.75rem 1rem',
+  const tabButtonStyle = {
+    padding: '1rem 2rem',
     border: 'none',
     backgroundColor: 'transparent',
-    color: isActive ? '#3b82f6' : '#6b7280',
-    borderBottom: isActive ? '2px solid #3b82f6' : '2px solid transparent',
     cursor: 'pointer',
-    fontWeight: isActive ? '600' : '500',
-    transition: 'all 0.2s'
-  });
+    fontSize: '1rem',
+    fontWeight: '500',
+    color: '#64748b',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    borderBottom: '3px solid transparent',
+    transition: 'all 0.2s ease',
+    position: 'relative'
+  };
+
+  const activeTabStyle = {
+    ...tabButtonStyle,
+    color: '#1e293b',
+    borderBottomColor: '#3b82f6',
+    fontWeight: '600'
+  };
+
+  const tabContentStyle = {
+    flex: 1
+  };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#f8fafc'
-    }}>
-      {/* Header */}
-      <Header
-        budget={budget}
-        onBudgetChange={handleBudgetChange}
+    <div style={containerStyle}>
+      {/* Header con Budget integrato */}
+      <Header 
+        dataCount={normalizedData.length}
         playerStatus={playerStatus}
-        onRefreshData={forceUpdate}
-        updateStatus={updateStatus}
+        budget={budget}
+        onBudgetChange={setBudget}
       />
 
-      {/* Navigation tabs */}
-      {!loading && !error && normalizedData.length > 0 && (
-        <div style={tabNavigationStyle}>
-          <button
-            style={tabButtonStyle(activeTab === 'giocatori')}
-            onClick={() => handleTabChange('giocatori')}
-          >
-            🏆 Giocatori
-          </button>
-          <button
-            style={tabButtonStyle(activeTab === 'rosa')}
-            onClick={() => handleTabChange('rosa')}
-          >
-            👥 Rosa Acquistata
-          </button>
+      {/* Navigation Tabs - solo se ci sono dati */}
+      {normalizedData.length > 0 && (
+        <div style={tabsContainerStyle}>
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={activeTab === tab.id ? activeTabStyle : tabButtonStyle}
+              onMouseEnter={(e) => {
+                if (activeTab !== tab.id) {
+                  e.target.style.color = '#374151';
+                  e.target.style.backgroundColor = '#f8fafc';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== tab.id) {
+                  e.target.style.color = '#64748b';
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <span style={{ fontSize: '1.125rem' }}>{tab.emoji}</span>
+              {tab.label}
+            </button>
+          ))}
         </div>
       )}
 
-      {/* Main content */}
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 1rem' }}>
-        {/* Loading */}
+      {/* Tab Content */}
+      <div style={tabContentStyle}>
         {loading && (
           <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
             padding: '3rem',
-            textAlign: 'center'
+            textAlign: 'center',
+            fontSize: '1.125rem',
+            color: '#64748b'
           }}>
-            <div style={{
-              width: '60px',
-              height: '60px',
-              border: '3px solid #e5e7eb',
-              borderTop: '3px solid #3b82f6',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              marginBottom: '1.5rem'
-            }} />
-            <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-              {updateStatus.isChecking ? 'Controllo aggiornamenti dataset...' : 'Caricamento dati in corso...'}
-            </div>
+            <div style={{ marginBottom: '1rem', fontSize: '2rem' }}>⏳</div>
+            Caricamento dati in corso...
           </div>
         )}
 
-        {/* Error */}
         {error && (
           <div style={{
             padding: '2rem',
@@ -303,24 +278,10 @@ const App = () => {
             <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
               Errore di caricamento
             </div>
-            <div style={{ marginBottom: '1rem' }}>{error}</div>
-            <button
-              onClick={forceUpdate}
-              style={{
-                backgroundColor: '#dc2626',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                padding: '0.5rem 1rem',
-                cursor: 'pointer'
-              }}
-            >
-              Riprova
-            </button>
+            <div>{error}</div>
           </div>
         )}
 
-        {/* Empty state */}
         {!loading && !error && normalizedData.length === 0 && (
           <div style={{
             padding: '3rem',
@@ -332,21 +293,19 @@ const App = () => {
             <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>
               Benvenuto in Fantavibe!
             </div>
-            <div>Carica i dati per iniziare.</div>
+            <div>I dati dei giocatori verranno caricati automaticamente.</div>
           </div>
         )}
 
-        {/* Content tabs */}
-        {!loading && !error && normalizedData.length > 0 && (
+        {normalizedData.length > 0 && (
           <>
             {activeTab === 'giocatori' && (
               <PlayersTab
                 players={normalizedData}
-                searchIndex={searchIndexFromNormalization} // Usa il searchIndex corretto
                 playerStatus={playerStatus}
-                onStatusChange={handlePlayerStatusChange}
+                onPlayerStatusChange={handlePlayerStatusChange}
                 onPlayerAcquire={handlePlayerAcquire}
-                budget={budget}
+                searchIndex={searchIndex}
               />
             )}
 
@@ -354,9 +313,8 @@ const App = () => {
               <RosaAcquistata
                 players={normalizedData}
                 playerStatus={playerStatus}
+                onPlayerStatusChange={handlePlayerStatusChange}
                 budget={budget}
-                onPlayerRemove={handlePlayerRemove}
-                onEditFantamilioni={handleEditFantamilioni}
               />
             )}
           </>
@@ -368,22 +326,10 @@ const App = () => {
         <FantamilioniModal
           player={playerToAcquire}
           onConfirm={handleFantamilioniConfirm}
-          onCancel={() => {
-            setShowFantamilioniModal(false);
-            setPlayerToAcquire(null);
-          }}
-          budget={budget}
-          currentSpent={getTotalFantamilioni(playerStatus)}
+          onCancel={handleFantamilioniCancel}
+          maxFantamilioni={budget - getTotalFantamilioni(playerStatus)}
         />
       )}
-
-      {/* CSS per l'animazione di loading */}
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 };
