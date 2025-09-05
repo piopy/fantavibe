@@ -5,10 +5,8 @@ import Header from './components/Header';
 import PlayersTab from './components/PlayersTab';
 import RosaAcquistata from './components/RosaAcquistata';
 import { normalizePlayerData } from './utils/dataUtils';
+import { checkAndUpdateDataset } from './utils/githubReleaseManager';
 import { canAffordPlayer, getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
-
-// AGGIUNGIAMO L'IMPORT PER IL DOWNLOAD (necessario per il fix)
-import { downloadDatasetFromGitHub } from './utils/githubReleaseManager';
 
 const App = () => {
   // Stati principali
@@ -75,22 +73,24 @@ const App = () => {
     setError(null);
     
     try {
-      // TENTATIVO 1: Prova a scaricare da GitHub
-      try {
-        console.log('🚀 Tentando download da GitHub...');
-        const downloadResult = await downloadDatasetFromGitHub();
-        const arrayBuffer = downloadResult.arrayBuffer; // FIX: estrai arrayBuffer dall'oggetto
-        const workbook = XLSX.read(arrayBuffer);
+      console.log('🚀 Controllo aggiornamenti e download...');
+      const result = await checkAndUpdateDataset();
+      
+      if (result.datasetBuffer) {
+        const workbook = XLSX.read(result.datasetBuffer);
         const sheetName = workbook.SheetNames[0];
         const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
         
         console.log('✅ Dati scaricati da GitHub, giocatori trovati:', data?.length || 0);
         setFpediaData(data);
-        return; // Successo, esci dalla funzione
-      } catch (downloadError) {
-        console.warn('⚠️ Download da GitHub fallito, provo file locale:', downloadError.message);
+        return;
       }
+    } catch (downloadError) {
+      console.warn('⚠️ Download da GitHub fallito, provo file locale:', downloadError.message);
+    }
 
+    try
+    {
       // TENTATIVO 2: Fallback al file locale
       console.log('📁 Caricando file locale...');
       const fpediaResponse = await fetch('/fpedia_analysis.xlsx');
