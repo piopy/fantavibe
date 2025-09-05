@@ -1,4 +1,4 @@
-// App.js
+// App.js - Fixed version
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import FantamilioniModal from './components/FantamilioniModal';
@@ -46,24 +46,12 @@ const App = () => {
     setPlayerStatus(status);
     setBudget(savedBudget);
     setIsInitialized(true);
+    
+    // Carica i dati all'avvio
+    loadData();
   }, []);
 
-  // Carica i dati all'avvio e quando cambia isInitialized
-  useEffect(() => {
-    if (isInitialized) {
-      loadData();
-    }
-  }, [isInitialized]);
-
-  // Salva il budget quando cambia (solo dopo l'inizializzazione)
-  useEffect(() => {
-    if (isInitialized) {
-      saveBudget(budget);
-      console.log('Budget salvato:', budget);
-    }
-  }, [budget, isInitialized]);
-
-  // Salva status giocatori quando cambia (solo dopo l'inizializzazione)
+  // Salva dati quando cambiano (solo dopo inizializzazione)
   useEffect(() => {
     if (isInitialized) {
       savePlayerStatus(playerStatus);
@@ -71,87 +59,60 @@ const App = () => {
     }
   }, [playerStatus, isInitialized]);
 
-  // Funzione per caricare i dati con il nuovo sistema di download diretto
+  useEffect(() => {
+    if (isInitialized) {
+      saveBudget(budget);
+      console.log('Budget salvato:', budget);
+    }
+  }, [budget, isInitialized]);
+
+  // Funzione per caricare i dati
   const loadData = async () => {
     setLoading(true);
     setError(null);
-    
-    setUpdateStatus(prev => ({
-      ...prev,
-      isChecking: true,
-      error: null
-    }));
+    setUpdateStatus(prev => ({ ...prev, isChecking: true, error: null }));
 
     try {
-      console.log('🔄 Inizio controllo aggiornamenti...');
+      console.log('🚀 Inizio caricamento dati...');
       
-      // Controlla se il file è cambiato e scarica se necessario
+      // Prima verifica se ci sono aggiornamenti
       const updateResult = await checkAndUpdateDataset();
       
-      if (updateResult.wasUpdated) {
-        console.log('📦 File aggiornato, carico nuovi dati...');
-        
-        // Usa i nuovi dati scaricati
-        const workbook = XLSX.read(updateResult.datasetBuffer);
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(sheet);
-        
-        setFpediaData(jsonData);
-        setUpdateStatus({
-          isChecking: false,
-          lastUpdate: new Date().toISOString(),
-          currentVersion: `Aggiornato ${new Date().toLocaleString()}`,
-          error: null
-        });
-        
-        console.log('✅ Dataset aggiornato con successo');
-        return;
-        
-      } else {
-        console.log('📋 File non cambiato, carico da cache locale...');
-        
-        // Prova a caricare da public come fallback
-        try {
-          const response = await fetch('/fpedia_analysis.xlsx');
-          if (response.ok) {
-            const buffer = await response.arrayBuffer();
-            const workbook = XLSX.read(buffer);
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(sheet);
-            
-            setFpediaData(jsonData);
-            setUpdateStatus({
-              isChecking: false,
-              lastUpdate: new Date().toISOString(),
-              currentVersion: 'File locale (nessun aggiornamento necessario)',
-              error: null
-            });
-            
-            console.log('✅ Caricato da file locale');
-          } else {
-            throw new Error('File locale non trovato');
-          }
-        } catch (localError) {
-          // Se anche il file locale fallisce, forza il download
-          console.log('🔄 File locale non disponibile, forzo download...');
-          
-          const { arrayBuffer } = await downloadDatasetFromGitHub();
-          const workbook = XLSX.read(arrayBuffer);
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(sheet);
-          
-          setFpediaData(jsonData);
-          setUpdateStatus({
-            isChecking: false,
-            lastUpdate: new Date().toISOString(),
-            currentVersion: `Download forzato ${new Date().toLocaleString()}`,
-            error: null
-          });
-          
-          console.log('✅ Download forzato completato');
-        }
-      }
+      setUpdateStatus(prev => ({
+        ...prev,
+        lastUpdate: updateResult.lastUpdate,
+        currentVersion: updateResult.currentVersion,
+        isChecking: false
+      }));
+
+      // Poi carica i dati (da file locale o scaricato)
+      let data;
       
+      try {
+        // Prova prima a scaricare l'ultima versione
+        data = await downloadDatasetFromGitHub();
+        console.log('✅ Dati scaricati da GitHub, giocatori trovati:', data?.length || 0);
+      } catch (downloadError) {
+        console.warn('⚠️ Fallback a file locale:', downloadError.message);
+        
+        // Fallback: carica file locale
+        const response = await fetch('/fpedia_analysis.xlsx');
+        if (!response.ok) throw new Error('File locale non trovato');
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer);
+        const sheetName = workbook.SheetNames[0];
+        data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        console.log('📁 Dati caricati da file locale, giocatori:', data?.length || 0);
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('Nessun dato trovato nel file');
+      }
+
+      setFpediaData(data);
+      console.log('✅ Caricamento completato con successo');
+
     } catch (error) {
       console.error('❌ Errore nel caricamento dati:', error);
       setError(`Errore nel caricamento: ${error.message}`);
@@ -171,12 +132,16 @@ const App = () => {
   };
 
   // Normalizza i dati per l'utilizzo nell'app
-  const normalizedData = useMemo(() => {
-    if (!fpediaData || fpediaData.length === 0) return [];
+  const normalizedDataResult = useMemo(() => {
+    if (!fpediaData || fpediaData.length === 0) return { players: [], searchIndex: new Map() };
     return normalizePlayerData(fpediaData);
   }, [fpediaData]);
 
-  // Crea indice di ricerca
+  // Estrai players e searchIndex dal risultato
+  const normalizedData = normalizedDataResult.players || [];
+  const searchIndexFromNormalization = normalizedDataResult.searchIndex || new Map();
+
+  // Crea indice di ricerca per componenti legacy (se necessario)
   const searchIndex = useMemo(() => {
     if (!normalizedData || normalizedData.length === 0) return [];
     
@@ -184,9 +149,9 @@ const App = () => {
       ...player,
       originalIndex: index,
       searchableText: [
-        player.nome,
-        player.ruolo,
-        player.squadra,
+        player.Nome, // Corretto: usa Nome con maiuscola
+        player.Ruolo,
+        player.Squadra,
         // Aggiungi altri campi ricercabili se necessario
       ].filter(Boolean).join(' ').toLowerCase()
     }));
@@ -257,107 +222,66 @@ const App = () => {
     padding: '0.75rem 1rem',
     border: 'none',
     backgroundColor: 'transparent',
-    color: isActive ? '#3b82f6' : '#64748b',
-    fontWeight: isActive ? '600' : '400',
+    color: isActive ? '#3b82f6' : '#6b7280',
     borderBottom: isActive ? '2px solid #3b82f6' : '2px solid transparent',
     cursor: 'pointer',
-    fontSize: '0.875rem',
+    fontWeight: isActive ? '600' : '500',
     transition: 'all 0.2s'
   });
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      backgroundColor: '#f8fafc',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#f8fafc'
     }}>
       {/* Header */}
       <Header
-        dataCount={normalizedData.length}
-        playerStatus={playerStatus}
         budget={budget}
         onBudgetChange={handleBudgetChange}
+        playerStatus={playerStatus}
+        onRefreshData={forceUpdate}
+        updateStatus={updateStatus}
       />
 
-      {/* Informazioni stato aggiornamento */}
-      {updateStatus.currentVersion && (
-        <div style={{
-          backgroundColor: '#f0f9ff',
-          border: '1px solid #7dd3fc',
-          padding: '0.5rem 1rem',
-          margin: '0 auto',
-          maxWidth: '1200px',
-          fontSize: '0.75rem',
-          color: '#0369a1',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <span>📊 Versione: {updateStatus.currentVersion}</span>
-          {updateStatus.lastUpdate && (
-            <span>🕒 Ultimo controllo: {new Date(updateStatus.lastUpdate).toLocaleString()}</span>
-          )}
+      {/* Navigation tabs */}
+      {!loading && !error && normalizedData.length > 0 && (
+        <div style={tabNavigationStyle}>
+          <button
+            style={tabButtonStyle(activeTab === 'giocatori')}
+            onClick={() => handleTabChange('giocatori')}
+          >
+            🏆 Giocatori
+          </button>
+          <button
+            style={tabButtonStyle(activeTab === 'rosa')}
+            onClick={() => handleTabChange('rosa')}
+          >
+            👥 Rosa Acquistata
+          </button>
         </div>
       )}
 
-      {updateStatus.error && (
-        <div style={{
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          padding: '0.5rem 1rem',
-          margin: '0 auto',
-          maxWidth: '1200px',
-          fontSize: '0.75rem',
-          color: '#dc2626'
-        }}>
-          ⚠️ {updateStatus.error}
-        </div>
-      )}
-
-      {/* Contenuto principale */}
-      <div style={{ 
-        maxWidth: '1200px', 
-        margin: '0 auto', 
-        padding: '1rem'
-      }}>
-        {/* Navigazione Tab */}
-        {!loading && !error && normalizedData.length > 0 && (
-          <div style={tabNavigationStyle}>
-            <button
-              style={tabButtonStyle(activeTab === 'giocatori')}
-              onClick={() => handleTabChange('giocatori')}
-            >
-              🔍 Giocatori
-            </button>
-            <button
-              style={tabButtonStyle(activeTab === 'rosa')}
-              onClick={() => handleTabChange('rosa')}
-            >
-              ⭐ La Mia Rosa
-            </button>
-          </div>
-        )}
-
+      {/* Main content */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 1rem' }}>
         {/* Loading */}
         {loading && (
           <div style={{
             display: 'flex',
-            justifyContent: 'center',
+            flexDirection: 'column',
             alignItems: 'center',
             padding: '3rem',
-            fontSize: '1.125rem',
-            color: '#64748b'
+            textAlign: 'center'
           }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ 
-                width: '40px', 
-                height: '40px', 
-                border: '4px solid #e2e8f0',
-                borderTop: '4px solid #3b82f6',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-                margin: '0 auto 1rem auto'
-              }} />
+            <div style={{
+              width: '60px',
+              height: '60px',
+              border: '3px solid #e5e7eb',
+              borderTop: '3px solid #3b82f6',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              marginBottom: '1.5rem'
+            }} />
+            <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
               {updateStatus.isChecking ? 'Controllo aggiornamenti dataset...' : 'Caricamento dati in corso...'}
             </div>
           </div>
@@ -418,7 +342,7 @@ const App = () => {
             {activeTab === 'giocatori' && (
               <PlayersTab
                 players={normalizedData}
-                searchIndex={searchIndex}
+                searchIndex={searchIndexFromNormalization} // Usa il searchIndex corretto
                 playerStatus={playerStatus}
                 onStatusChange={handlePlayerStatusChange}
                 onPlayerAcquire={handlePlayerAcquire}
