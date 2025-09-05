@@ -8,7 +8,8 @@ export async function handler(event, context) {
 		headers: {
 			Accept:
 				"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-			"User-Agent": "FantaVibe-App",
+				"User-Agent": "FantaVibe-App",
+				"Access-Control-Allow-Origin": "*",
 		},
 	});
 
