@@ -15,12 +15,21 @@ export const getLatestReleaseInfo = async () => {
     
     const releaseData = await response.json();
     
+    // Trova il file Excel tra gli assets
+    const excelAsset = releaseData.assets.find(asset => 
+      asset.name === 'fpedia_analysis.xlsx'
+    );
+    
+    if (!excelAsset) {
+      throw new Error('File fpedia_analysis.xlsx non trovato negli assets della release');
+    }
+    
     return {
       tagName: releaseData.tag_name,
       publishedAt: releaseData.published_at,
       id: releaseData.id,
-      // Usa sempre jsDelivr CDN - bypassa CORS
-      downloadUrl: `https://cdn.jsdelivr.net/gh/informagico/fantavibe-dataset@${releaseData.tag_name}/fpedia_analysis.xlsx`
+      // URL diretto di download da GitHub
+      downloadUrl: excelAsset.browser_download_url
     };
   } catch (error) {
     console.error('Errore nel recupero delle informazioni sulla release:', error);
@@ -64,28 +73,36 @@ export const hasNewRelease = (currentRelease, storedRelease) => {
 };
 
 /**
- * Scarica il dataset usando jsDelivr CDN (no CORS)
+ * Scarica il dataset direttamente da GitHub
  */
-export const downloadDatasetFromCDN = async (cdnUrl) => {
+export const downloadDatasetFromGitHub = async (githubUrl) => {
   try {
-    console.log('Scaricando da CDN:', cdnUrl);
+    console.log('Scaricando direttamente da GitHub:', githubUrl);
     
-    const response = await fetch(cdnUrl);
+    const response = await fetch(githubUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        // Aggiungi User-Agent per evitare eventuali blocchi
+        'User-Agent': 'FantaVibe-App'
+      }
+    });
+    
     if (!response.ok) {
-      throw new Error(`CDN download failed: ${response.status}`);
+      throw new Error(`GitHub download failed: ${response.status} ${response.statusText}`);
     }
     
     const arrayBuffer = await response.arrayBuffer();
-    console.log('✅ Download CDN riuscito:', arrayBuffer.byteLength, 'bytes');
+    console.log('✅ Download GitHub riuscito:', arrayBuffer.byteLength, 'bytes');
     return arrayBuffer;
   } catch (error) {
-    console.error('Errore download CDN:', error);
+    console.error('Errore download GitHub:', error);
     throw error;
   }
 };
 
 /**
- * Funzione principale semplificata
+ * Funzione principale per controllo e aggiornamento dataset
  */
 export const checkAndUpdateDataset = async () => {
   try {
@@ -101,10 +118,11 @@ export const checkAndUpdateDataset = async () => {
     console.log('Release corrente:', latestRelease.tagName);
     console.log('Release salvata:', storedRelease?.tagName || 'Nessuna');
     console.log('Aggiornamento necessario:', needsUpdate);
+    console.log('URL download:', latestRelease.downloadUrl);
     
     if (needsUpdate) {
-      // Scarica da CDN
-      const datasetBuffer = await downloadDatasetFromCDN(latestRelease.downloadUrl);
+      // Scarica direttamente da GitHub
+      const datasetBuffer = await downloadDatasetFromGitHub(latestRelease.downloadUrl);
       
       // Salva info release
       saveReleaseInfo(latestRelease);
