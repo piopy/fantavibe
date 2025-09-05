@@ -7,7 +7,7 @@ import PlayersTab from './components/PlayersTab';
 import RosaAcquistata from './components/RosaAcquistata';
 import { normalizePlayerData } from './utils/dataUtils';
 import { checkAndUpdateDataset } from './utils/githubReleaseManager';
-import { canAffordPlayer, getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
+import { getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
 
 const App = () => {
   // Stati principali
