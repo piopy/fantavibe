@@ -96,6 +96,7 @@ export const downloadDatasetFromGitHub = async () => {
       throw new Error(`Download failed: ${response.status} ${response.statusText}`);
     }
     
+    // Directly get arrayBuffer since Netlify will decode base64 for us
     const arrayBuffer = await response.arrayBuffer();
     console.log('✅ Download riuscito:', arrayBuffer.byteLength, 'bytes');
     
@@ -139,7 +140,7 @@ export const checkAndUpdateDataset = async () => {
       const { arrayBuffer, fileInfo } = await downloadDatasetFromGitHub();
       
       // Salva info file
-      saveFileInfo(fileInfo);
+      //saveFileInfo(fileInfo);
       
       return {
         datasetBuffer: arrayBuffer,
