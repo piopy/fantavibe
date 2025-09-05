@@ -90,7 +90,7 @@ export const downloadDatasetFromGitHub = async () => {
   try {
     console.log('Scaricando direttamente da:', process.env.DIRECT_FILE_URL);
         
-    const response = await fetch("/.netlify/functions/download");
+    const response = await fetch("/.netlify/functions/download-data");
     
     if (!response.ok) {
       throw new Error(`Download failed: ${response.status} ${response.statusText}`);
