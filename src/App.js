@@ -1,3 +1,4 @@
+// App.js
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import FantamilioniModal from './components/FantamilioniModal';
@@ -5,6 +6,7 @@ import Header from './components/Header';
 import PlayersTab from './components/PlayersTab';
 import RosaAcquistata from './components/RosaAcquistata';
 import { normalizePlayerData } from './utils/dataUtils';
+import { checkAndUpdateDataset } from './utils/githubReleaseManager';
 import { canAffordPlayer, getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
 
 const App = () => {
@@ -25,6 +27,14 @@ const App = () => {
   const [showFantamilioniModal, setShowFantamilioniModal] = useState(false);
   const [playerToAcquire, setPlayerToAcquire] = useState(null);
 
+  // Stati per il monitoraggio aggiornamenti
+  const [updateStatus, setUpdateStatus] = useState({
+    isChecking: false,
+    lastUpdate: null,
+    currentVersion: null,
+    error: null
+  });
+
   // Carica status giocatori all'avvio
   useEffect(() => {
     const status = loadPlayerStatus();
@@ -39,7 +49,8 @@ const App = () => {
     // Segna come inizializzato DOPO aver caricato i dati
     setIsInitialized(true);
     
-    loadDataFromPublic();
+    // Avvia il controllo automatico degli aggiornamenti
+    loadDataWithUpdateCheck();
   }, []);
 
   // Salva automaticamente lo status dei giocatori
@@ -66,29 +77,80 @@ const App = () => {
     saveBudget(budget);
   }, [budget, isInitialized]);
 
-  // Caricamento automatico del file dalla cartella public
-  const loadDataFromPublic = async () => {
+  // Funzione semplificata per il caricamento
+  const loadDataWithUpdateCheck = async () => {
     setLoading(true);
     setError(null);
+    setUpdateStatus(prev => ({ ...prev, isChecking: true, error: null }));
     
     try {
-      // Carica solo FPEDIA
-      const fpediaResponse = await fetch('/fpedia_analysis.xlsx');
-      if (fpediaResponse.ok) {
-        const fpediaBuffer = await fpediaResponse.arrayBuffer();
-        const fpediaWorkbook = XLSX.read(fpediaBuffer);
-        const fpediaSheet = fpediaWorkbook.Sheets[fpediaWorkbook.SheetNames[0]];
-        const fpediaJson = XLSX.utils.sheet_to_json(fpediaSheet);
-        setFpediaData(fpediaJson);
+      // Prova GitHub + CDN
+      console.log('Controllo aggiornamenti...');
+      const updateResult = await checkAndUpdateDataset();
+      
+      if (updateResult.datasetBuffer) {
+        // Nuovo dataset scaricato
+        const workbook = XLSX.read(updateResult.datasetBuffer);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(sheet);
+        
+        setFpediaData(jsonData);
+        setUpdateStatus({
+          isChecking: false,
+          lastUpdate: new Date().toISOString(),
+          currentVersion: updateResult.releaseInfo.tagName,
+          error: null
+        });
+        
+        console.log('✅ Dataset aggiornato alla versione:', updateResult.releaseInfo.tagName);
+        return;
       } else {
-        setError('File fpedia_analysis.xlsx non trovato nella cartella public. Usa il caricamento manuale.');
+        // Nessun aggiornamento necessario, carica da public
+        console.log('Nessun aggiornamento, carico da public...');
+        throw new Error('fallback_to_public');
       }
-    } catch (err) {
-      setError('Errore nel caricamento del file. Usa il caricamento manuale.');
-      console.error('Errore caricamento automatico:', err);
+      
+    } catch (gitHubError) {
+      console.warn('GitHub fallito, uso file locale:', gitHubError.message);
+      
+      // Fallback: carica da public
+      try {
+        const response = await fetch('/fpedia_analysis.xlsx');
+        if (response.ok) {
+          const buffer = await response.arrayBuffer();
+          const workbook = XLSX.read(buffer);
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(sheet);
+          
+          setFpediaData(jsonData);
+          setUpdateStatus({
+            isChecking: false,
+            lastUpdate: new Date().toISOString(),
+            currentVersion: 'File locale',
+            error: 'Usando file locale (GitHub non disponibile)'
+          });
+          
+          console.log('✅ Caricato da file locale');
+        } else {
+          throw new Error('File locale non trovato');
+        }
+      } catch (localError) {
+        setError('Impossibile caricare il dataset né da GitHub né localmente');
+        setUpdateStatus({
+          isChecking: false,
+          lastUpdate: null,
+          currentVersion: null,
+          error: `GitHub: ${gitHubError.message}, Locale: ${localError.message}`
+        });
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  // Funzione per forzare il controllo
+  const forceUpdate = async () => {
+    await loadDataWithUpdateCheck();
   };
 
   // Normalizza i dati e crea indice di ricerca
@@ -116,114 +178,171 @@ const App = () => {
   const handleFantamilioniConfirm = (fantamilioni) => {
     if (playerToAcquire) {
       // Controllo budget
-      if (!canAffordPlayer(fantamilioni, budget, playerStatus)) {
-        alert(`Non hai abbastanza fantamilioni! Budget rimanente: ${budget - getTotalFantamilioni(playerStatus)} FM`);
+      const totalSpent = getTotalFantamilioni(playerStatus);
+      if (totalSpent + fantamilioni > budget) {
+        alert(`Non hai abbastanza fantamilioni! Disponibili: ${budget - totalSpent} FM`);
         return;
       }
-      
-      handlePlayerStatusChange(playerToAcquire.id, 'acquired', fantamilioni);
+
+      handlePlayerStatusChange(playerToAcquire.id, 'acquistato', fantamilioni);
       setShowFantamilioniModal(false);
       setPlayerToAcquire(null);
     }
   };
 
-  const handleFantamilioniCancel = () => {
-    setShowFantamilioniModal(false);
-    setPlayerToAcquire(null);
+  // Gestione cancellazione acquisto
+  const handlePlayerRemove = (playerId) => {
+    if (window.confirm('Sei sicuro di voler rimuovere questo giocatore dalla rosa?')) {
+      handlePlayerStatusChange(playerId, 'disponibile', null);
+    }
   };
 
-  // Tab configuration
+  // Gestione modifica fantamilioni
+  const handleEditFantamilioni = (playerId, newFantamilioni) => {
+    handlePlayerStatusChange(playerId, 'acquistato', newFantamilioni);
+  };
+
+  // Configurazione delle tab
   const tabs = [
-    { 
-      id: 'giocatori', 
-      label: 'Giocatori', 
-      emoji: '👤',
-      description: 'Cerca e visualizza tutti i giocatori con statistiche e classifiche'
-    },
-    { 
-      id: 'rosa', 
-      label: 'La Mia Rosa', 
-      emoji: '⭐',
-      description: 'Visualizza i giocatori che hai acquistato e gestisci il budget'
-    }
+    { id: 'giocatori', label: 'Giocatori', emoji: '⚽' },
+    { id: 'rosa', label: 'Rosa Acquistata', emoji: '🏆' }
   ];
 
   // Stili
   const containerStyle = {
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    backgroundColor: '#f8fafc',
     minHeight: '100vh',
-    backgroundColor: '#f8fafc'
+    color: '#1e293b'
   };
 
-  const tabsContainerStyle = {
-    display: 'flex',
-    justifyContent: 'center',
+  const tabNavStyle = {
+    backgroundColor: '#ffffff',
+    borderBottom: '1px solid #e2e8f0',
     padding: '0 1rem',
-    backgroundColor: 'white',
-    borderBottom: '1px solid #e2e8f0'
+    position: 'sticky',
+    top: 0,
+    zIndex: 10
+  };
+
+  const tabButtonsStyle = {
+    display: 'flex',
+    gap: '0.5rem',
+    maxWidth: '1200px',
+    margin: '0 auto'
   };
 
   const tabButtonStyle = {
-    padding: '1rem 2rem',
+    padding: '1rem 1.5rem',
     border: 'none',
     backgroundColor: 'transparent',
-    cursor: 'pointer',
-    fontSize: '1rem',
-    fontWeight: '500',
     color: '#64748b',
+    cursor: 'pointer',
+    borderBottom: '2px solid transparent',
+    fontSize: '0.875rem',
+    fontWeight: '500',
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
-    borderBottom: '3px solid transparent',
-    transition: 'all 0.2s ease',
-    position: 'relative'
+    transition: 'all 0.2s ease'
   };
 
   const activeTabStyle = {
     ...tabButtonStyle,
-    color: '#1e293b',
-    borderBottomColor: '#3b82f6',
-    fontWeight: '600'
+    color: '#2563eb',
+    borderBottomColor: '#2563eb',
+    backgroundColor: '#f8fafc'
   };
 
   const tabContentStyle = {
-    flex: 1
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '2rem 1rem'
+  };
+
+  // Componente per mostrare lo stato degli aggiornamenti
+  const UpdateStatus = () => {
+    if (!updateStatus.lastUpdate && !updateStatus.isChecking) return null;
+
+    return (
+      <div style={{
+        backgroundColor: updateStatus.error ? '#fef2f2' : '#f0f9ff',
+        border: `1px solid ${updateStatus.error ? '#fecaca' : '#bae6fd'}`,
+        borderRadius: '0.5rem',
+        padding: '0.75rem 1rem',
+        margin: '1rem 0',
+        fontSize: '0.875rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span>{updateStatus.isChecking ? '🔄' : updateStatus.error ? '⚠️' : '✅'}</span>
+          <span>
+            {updateStatus.isChecking ? 'Controllo aggiornamenti...' : 
+             updateStatus.error ? `Stato: ${updateStatus.error}` :
+             `Dataset aggiornato - Versione: ${updateStatus.currentVersion}`}
+          </span>
+        </div>
+        {!updateStatus.isChecking && (
+          <button
+            onClick={forceUpdate}
+            style={{
+              background: 'none',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.25rem',
+              padding: '0.25rem 0.5rem',
+              cursor: 'pointer',
+              fontSize: '0.75rem'
+            }}
+          >
+            🔄 Controlla aggiornamenti
+          </button>
+        )}
+      </div>
+    );
   };
 
   return (
     <div style={containerStyle}>
-      {/* Header con Budget integrato */}
       <Header 
-        dataCount={normalizedData.length}
+        budget={budget} 
+        setBudget={setBudget}
         playerStatus={playerStatus}
-        budget={budget}
-        onBudgetChange={setBudget}
       />
 
-      {/* Navigation Tabs - solo se ci sono dati */}
-      {normalizedData.length > 0 && (
-        <div style={tabsContainerStyle}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={activeTab === tab.id ? activeTabStyle : tabButtonStyle}
-              onMouseEnter={(e) => {
-                if (activeTab !== tab.id) {
-                  e.target.style.color = '#374151';
-                  e.target.style.backgroundColor = '#f8fafc';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (activeTab !== tab.id) {
-                  e.target.style.color = '#64748b';
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <span style={{ fontSize: '1.125rem' }}>{tab.emoji}</span>
-              {tab.label}
-            </button>
-          ))}
+      {/* Stato aggiornamenti */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 1rem' }}>
+        <UpdateStatus />
+      </div>
+
+      {/* Navigazione Tab */}
+      {!loading && !error && normalizedData.length > 0 && (
+        <div style={tabNavStyle}>
+          <div style={tabButtonsStyle}>
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={activeTab === tab.id ? activeTabStyle : tabButtonStyle}
+                onMouseEnter={(e) => {
+                  if (activeTab !== tab.id) {
+                    e.target.style.color = '#374151';
+                    e.target.style.backgroundColor = '#f8fafc';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (activeTab !== tab.id) {
+                    e.target.style.color = '#64748b';
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span style={{ fontSize: '1.125rem' }}>{tab.emoji}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -237,7 +356,7 @@ const App = () => {
             color: '#64748b'
           }}>
             <div style={{ marginBottom: '1rem', fontSize: '2rem' }}>⏳</div>
-            Caricamento dati in corso...
+            {updateStatus.isChecking ? 'Controllo aggiornamenti dataset...' : 'Caricamento dati in corso...'}
           </div>
         )}
 
@@ -256,7 +375,20 @@ const App = () => {
             <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
               Errore di caricamento
             </div>
-            <div>{error}</div>
+            <div style={{ marginBottom: '1rem' }}>{error}</div>
+            <button
+              onClick={forceUpdate}
+              style={{
+                backgroundColor: '#dc2626',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.375rem',
+                padding: '0.5rem 1rem',
+                cursor: 'pointer'
+              }}
+            >
+              Riprova
+            </button>
           </div>
         )}
 
@@ -271,19 +403,20 @@ const App = () => {
             <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>
               Benvenuto in Fantavibe!
             </div>
-            <div>I dati dei giocatori verranno caricati automaticamente.</div>
+            <div>Carica i dati per iniziare.</div>
           </div>
         )}
 
-        {normalizedData.length > 0 && (
+        {!loading && !error && normalizedData.length > 0 && (
           <>
             {activeTab === 'giocatori' && (
               <PlayersTab
                 players={normalizedData}
-                playerStatus={playerStatus}
-                onPlayerStatusChange={handlePlayerStatusChange}
-                onPlayerAcquire={handlePlayerAcquire}
                 searchIndex={searchIndex}
+                playerStatus={playerStatus}
+                onStatusChange={handlePlayerStatusChange}
+                onPlayerAcquire={handlePlayerAcquire}
+                budget={budget}
               />
             )}
 
@@ -291,8 +424,9 @@ const App = () => {
               <RosaAcquistata
                 players={normalizedData}
                 playerStatus={playerStatus}
-                onPlayerStatusChange={handlePlayerStatusChange}
                 budget={budget}
+                onPlayerRemove={handlePlayerRemove}
+                onEditFantamilioni={handleEditFantamilioni}
               />
             )}
           </>
@@ -304,8 +438,12 @@ const App = () => {
         <FantamilioniModal
           player={playerToAcquire}
           onConfirm={handleFantamilioniConfirm}
-          onCancel={handleFantamilioniCancel}
-          maxFantamilioni={budget - getTotalFantamilioni(playerStatus)}
+          onCancel={() => {
+            setShowFantamilioniModal(false);
+            setPlayerToAcquire(null);
+          }}
+          budget={budget}
+          currentSpent={getTotalFantamilioni(playerStatus)}
         />
       )}
     </div>
