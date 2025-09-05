@@ -89,15 +89,9 @@ export const hasFileChanged = (currentFileInfo, storedFileInfo) => {
  */
 export const downloadDatasetFromGitHub = async () => {
   try {
-    console.log('Scaricando direttamente da:', DIRECT_FILE_URL);
-    
-    const response = await fetch(DIRECT_FILE_URL, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'User-Agent': 'FantaVibe-App'
-      }
-    });
+    console.log('Scaricando direttamente da:', process.env.DIRECT_FILE_URL);
+        
+    const response = await fetch("/.netlify/functions/download");
     
     if (!response.ok) {
       throw new Error(`Download failed: ${response.status} ${response.statusText}`);
