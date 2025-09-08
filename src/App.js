@@ -5,7 +5,7 @@ import Header from './components/Header';
 import PlayersTab from './components/PlayersTab';
 import RosaAcquistata from './components/RosaAcquistata';
 import { normalizePlayerData } from './utils/dataUtils';
-import { checkAndUpdateDataset } from './utils/githubReleaseManager';
+import { checkAndUpdateDataset, clearAllCache, forceRefresh, getCacheInfo } from './utils/githubReleaseManager';
 import { canAffordPlayer, getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
 
 const App = () => {
@@ -26,6 +26,10 @@ const App = () => {
   const [showFantamilioniModal, setShowFantamilioniModal] = useState(false);
   const [playerToAcquire, setPlayerToAcquire] = useState(null);
 
+  // Stati per gestione cache
+  const [cacheInfo, setCacheInfo] = useState(null);
+  const [downloadInfo, setDownloadInfo] = useState(null);
+
   // Carica status giocatori all'avvio
   useEffect(() => {
     const status = loadPlayerStatus();
@@ -41,6 +45,12 @@ const App = () => {
     setIsInitialized(true);
     
     loadDataFromPublic();
+  }, []);
+
+  useEffect(() => {
+    const cacheDetails = getCacheInfo();
+    setCacheInfo(cacheDetails);
+    console.log('📊 Cache info caricata:', cacheDetails);
   }, []);
 
   // Salva automaticamente lo status dei giocatori
@@ -67,27 +77,46 @@ const App = () => {
     saveBudget(budget);
   }, [budget, isInitialized]);
 
-  // Caricamento automatico del file
+  // Caricamento automatico del file con sistema di cache intelligente
   const loadDataFromPublic = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // TENTATIVO 1: Prova a scaricare da GitHub
+      // TENTATIVO 1: Prova a scaricare da GitHub con cache intelligente
       try {
-        console.log('🚀 Tentando download da GitHub...');
+        console.log('🚀 Tentando download da GitHub con cache...');
 
         const downloadResult = await checkAndUpdateDataset();
+        setDownloadInfo(downloadResult); // ← AGGIUNTA PER CACHE
+        
         const arrayBuffer = downloadResult.datasetBuffer;
         const workbook = XLSX.read(arrayBuffer, {type:"binary"});
         const sheetName = workbook.SheetNames[0];
         const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
         
-        console.log('✅ Dati scaricati da GitHub, giocatori trovati:', data?.length || 0);
+        // Log informativo sulla fonte dei dati
+        const source = downloadResult.fromCache ? 
+          (downloadResult.expired ? 'cache scaduta' : 'cache') : 
+          'download';
+        
+        console.log(`✅ Dati caricati da ${source}, giocatori trovati:`, data?.length || 0);
+        
+        if (downloadResult.fromCache) {
+          const ageHours = downloadResult.cacheAge ? 
+            ((new Date() - new Date(downloadResult.cacheAge)) / (1000 * 60 * 60)).toFixed(1) : 'N/A';
+          console.log(`📦 Cache utilizzata, età: ${ageHours} ore`);
+        }
+        
         setFpediaData(data);
+        
+        // Aggiorna info cache alla fine del caricamento ← AGGIUNTA PER CACHE
+        setCacheInfo(getCacheInfo());
         return;
+        
       } catch (error) {
         console.warn('⚠️ Download da GitHub fallito, provo file locale:', error.message);
+        setDownloadInfo({ error: error.message }); // ← AGGIUNTA PER CACHE
       }
 
       // TENTATIVO 2: Fallback al file locale
@@ -101,6 +130,7 @@ const App = () => {
         
         console.log('✅ Dati caricati da file locale, giocatori:', fpediaJson?.length || 0);
         setFpediaData(fpediaJson);
+        setDownloadInfo({ fromLocal: true }); // ← AGGIUNTA PER CACHE
       } else {
         setError('File fpedia_analysis.xlsx non trovato nella cartella public. Verifica che il file sia presente.');
       }
@@ -109,6 +139,8 @@ const App = () => {
       console.error('Errore caricamento automatico:', err);
     } finally {
       setLoading(false);
+      // Aggiorna info cache alla fine del caricamento ← AGGIUNTA PER CACHE
+      setCacheInfo(getCacheInfo());
     }
   };
 
@@ -210,6 +242,114 @@ const App = () => {
     flex: 1
   };
 
+  // Funzioni per gestione cache
+  const handleForceRefresh = async () => {
+    if (window.confirm('Vuoi forzare il download dei dati più recenti? Questo cancellerà la cache.')) {
+      setLoading(true);
+      try {
+        const result = await forceRefresh();
+        setDownloadInfo(result);
+        
+        const arrayBuffer = result.datasetBuffer;
+        const workbook = XLSX.read(arrayBuffer, {type:"binary"});
+        const sheetName = workbook.SheetNames[0];
+        const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        
+        setFpediaData(data);
+        setCacheInfo(getCacheInfo());
+        setError(null);
+        
+        console.log('✅ Refresh forzato completato');
+      } catch (error) {
+        setError('Errore durante il refresh forzato: ' + error.message);
+        console.error('❌ Errore refresh:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleClearCache = () => {
+    if (window.confirm('Vuoi cancellare tutta la cache? Al prossimo caricamento i dati verranno scaricati nuovamente.')) {
+      clearAllCache();
+      setCacheInfo(getCacheInfo());
+      console.log('🧹 Cache cancellata');
+    }
+  };
+
+  const renderCacheInfo = () => {
+    if (!cacheInfo && !downloadInfo) return null;
+    
+    return (
+      <div style={{ 
+        margin: '10px 0', 
+        padding: '8px', 
+        backgroundColor: '#f8f9fa', 
+        borderRadius: '4px',
+        fontSize: '12px',
+        color: '#666',
+        border: '1px solid #e9ecef'
+      }}>
+        <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Info fonte dati */}
+          {downloadInfo && (
+            <span>
+              <strong>Fonte:</strong> {
+                downloadInfo.fromCache ? (
+                  downloadInfo.expired ? '📦 Cache (scaduta)' : '📦 Cache'
+                ) : downloadInfo.error ? '❌ Errore' : '⬇️ Download'
+              }
+            </span>
+          )}
+          
+          {/* Info cache */}
+          {cacheInfo?.hasCache && (
+            <span>
+              <strong>Cache:</strong> {cacheInfo.ageHours.toFixed(1)}h fa 
+              ({cacheInfo.isValid ? '✅' : '⚠️'}),
+              {(cacheInfo.size / 1024).toFixed(1)} KB
+            </span>
+          )}
+          
+          {/* Pulsanti azioni */}
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <button 
+              onClick={handleForceRefresh}
+              style={{ 
+                padding: '2px 6px', 
+                fontSize: '11px', 
+                backgroundColor: '#007bff', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '3px',
+                cursor: 'pointer'
+              }}
+            >
+              🔄 Refresh
+            </button>
+            {cacheInfo?.hasCache && (
+              <button 
+                onClick={handleClearCache}
+                style={{ 
+                  padding: '2px 6px', 
+                  fontSize: '11px', 
+                  backgroundColor: '#dc3545', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '3px',
+                  cursor: 'pointer'
+                }}
+              >
+                🧹 Clear
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+
   return (
     <div style={containerStyle}>
       {/* Header con Budget integrato */}
@@ -219,6 +359,8 @@ const App = () => {
         budget={budget}
         onBudgetChange={setBudget}
       />
+
+      {renderCacheInfo()}
 
       {/* Navigation Tabs - solo se ci sono dati */}
       {normalizedData.length > 0 && (

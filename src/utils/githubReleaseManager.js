@@ -1,4 +1,10 @@
 const STORAGE_KEY_LAST_FILE = 'fantavibe_last_file_info';
+const STORAGE_KEY_FILE_CONTENT = 'fantavibe_cached_content';
+const STORAGE_KEY_CACHE_TIMESTAMP = 'fantavibe_cache_timestamp';
+
+// Configurazione cache
+const CACHE_EXPIRY_HOURS = 24;
+const MAX_CACHE_SIZE = 5 * 1024 * 1024;
 
 /**
  * Ottiene l'ETag o altre info di cache del file
@@ -7,10 +13,9 @@ export const getFileInfo = async () => {
   try {
     console.log('Getting file info via Netlify function...');
     
-    // Chiamata alla Netlify function invece del fetch diretto
     const response = await fetch("/.netlify/functions/get-file-info", {
       method: "GET",
-      credentials: 'omit', // Explicitly omit credentials
+      credentials: 'omit',
       cache: 'no-cache'
     });
     
@@ -83,56 +88,235 @@ export const hasFileChanged = (currentFileInfo, storedFileInfo) => {
     return currentFileInfo.contentLength !== storedFileInfo.contentLength;
   }
   
-  // Se non abbiamo info sufficienti, considera cambiato
+  // Se non abbiamo metadati sufficienti, assumiamo che sia cambiato
   return true;
 };
 
 /**
- * Scarica il dataset direttamente dall'URL specificato
- * Versione ottimizzata per compatibilità CORS con Firefox
- * Continua ad usare la funzione download-data esistente
+ * Controlla se la cache è ancora valida
  */
-export const downloadDatasetFromGitHub = async () => {
+const isCacheValid = () => {
   try {
-    console.log('Scaricando direttamente via Netlify function...');
+    const timestamp = localStorage.getItem(STORAGE_KEY_CACHE_TIMESTAMP);
+    if (!timestamp) return false;
     
-    // Usa la funzione Netlify esistente per il download
-    const response = await fetch("/.netlify/functions/download-data", {
-      method: "GET",
-      credentials: 'omit',
-      cache: 'no-cache'
-    });
+    const cacheDate = new Date(timestamp);
+    const now = new Date();
+    const hoursDiff = (now - cacheDate) / (1000 * 60 * 60);
     
-    if (!response.ok) {
-      if (response.status === 0) {
-        throw new Error('Network error or CORS blocked the request');
-      }
-      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+    const isValid = hoursDiff < CACHE_EXPIRY_HOURS;
+    console.log(`Cache age: ${hoursDiff.toFixed(1)} hours, valid: ${isValid}`);
+    return isValid;
+  } catch (error) {
+    console.error('Errore nel controllo validità cache:', error);
+    return false;
+  }
+};
+
+/**
+ * Salva i dati del file nella cache
+ */
+const saveCachedContent = (data, fileInfo) => {
+  const cacheData = {
+    data: data,
+    fileInfo: fileInfo,
+    timestamp: new Date().toISOString(),
+    version: '1.0'
+  };
+
+  try {    
+    const serialized = JSON.stringify(cacheData);
+    
+    // Controlla dimensione
+    if (serialized.length > MAX_CACHE_SIZE) {
+      console.warn('⚠️ Contenuto troppo grande per la cache, skip salvataggio');
+      return false;
     }
     
-    // Directly get arrayBuffer since Netlify will decode base64 for us
-    const arrayBuffer = await response.arrayBuffer();
-    console.log('✅ Download riuscito via Netlify function:', arrayBuffer.byteLength, 'bytes');
+    localStorage.setItem(STORAGE_KEY_FILE_CONTENT, serialized);
+    localStorage.setItem(STORAGE_KEY_CACHE_TIMESTAMP, cacheData.timestamp);
     
-    // Ottieni anche le info del file dalla risposta
-    const fileInfo = {
-      etag: response.headers.get('etag') || response.headers.get('ETag'),
-      lastModified: response.headers.get('last-modified') || response.headers.get('Last-Modified'),
-      contentLength: response.headers.get('content-length') || response.headers.get('Content-Length'),
-      timestamp: new Date().toISOString()
+    console.log('✅ Contenuto salvato nella cache, dimensione:', (serialized.length / 1024).toFixed(1), 'KB');
+    return true;
+  } catch (error) {
+    console.error('Errore nel salvataggio della cache:', error);
+    
+    // Se è un errore di quota, prova a pulire cache vecchia
+    if (error.name === 'QuotaExceededError') {
+      console.log('🧹 Tentativo di pulizia cache per spazio...');
+      clearCachedContent();
+      
+      // Riprova una volta
+      try {
+        localStorage.setItem(STORAGE_KEY_FILE_CONTENT, JSON.stringify(cacheData));
+        localStorage.setItem(STORAGE_KEY_CACHE_TIMESTAMP, cacheData.timestamp);
+        console.log('✅ Contenuto salvato nella cache dopo pulizia');
+        return true;
+      } catch (retryError) {
+        console.error('❌ Impossibile salvare nella cache anche dopo pulizia:', retryError);
+      }
+    }
+    
+    return false;
+  }
+};
+
+/**
+ * Carica i dati del file dalla cache
+ */
+const loadCachedContent = () => {
+  try {
+    const cached = localStorage.getItem(STORAGE_KEY_FILE_CONTENT);
+    if (!cached) {
+      console.log('📦 Nessun contenuto nella cache');
+      return null;
+    }
+    
+    const cacheData = JSON.parse(cached);
+    
+    // Verifica struttura
+    if (!cacheData.data || !cacheData.timestamp) {
+      console.warn('⚠️ Struttura cache corrotta, rimozione...');
+      clearCachedContent();
+      return null;
+    }
+    
+    console.log('📦 Contenuto caricato dalla cache, timestamp:', cacheData.timestamp);
+    return cacheData;
+  } catch (error) {
+    console.error('Errore nel caricamento della cache:', error);
+    clearCachedContent(); // Pulisce cache corrotta
+    return null;
+  }
+};
+
+/**
+ * Rimuove il contenuto dalla cache
+ */
+const clearCachedContent = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY_FILE_CONTENT);
+    localStorage.removeItem(STORAGE_KEY_CACHE_TIMESTAMP);
+    console.log('🧹 Cache contenuto pulita');
+  } catch (error) {
+    console.error('Errore nella pulizia cache:', error);
+  }
+};
+
+/**
+ * Scarica il file da GitHub
+ */
+const downloadFileContent = async () => {
+  console.log('⬇️ Downloading file content from GitHub...');
+  
+  const response = await fetch("/.netlify/functions/download-data", {
+    method: "GET",
+    credentials: 'omit',
+    cache: 'no-cache'
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`Download failed: ${response.status} - ${errorData.error || response.statusText}`);
+  }
+  
+  const arrayBuffer = await response.arrayBuffer();
+  console.log('✅ File downloaded, size:', (arrayBuffer.byteLength / 1024).toFixed(1), 'KB');
+  
+  return arrayBuffer;
+};
+
+/**
+ * Funzione principale per gestire il download e la cache
+ */
+export const checkAndUpdateDataset = async () => {
+  try {
+    console.log('🔍 Controllo aggiornamenti dataset...');
+    
+    // 1. Controlla info file remoto
+    let currentFileInfo;
+    try {
+      currentFileInfo = await getFileInfo();
+    } catch (error) {
+      console.warn('⚠️ Impossibile controllare info file remoto:', error.message);
+      
+      // Prova a usare cache se disponibile
+      const cachedData = loadCachedContent();
+      if (cachedData && isCacheValid()) {
+        console.log('📦 Usando dati dalla cache (remoto non disponibile)');
+        return {
+          datasetBuffer: cachedData.data,
+          fromCache: true,
+          cacheAge: cachedData.timestamp
+        };
+      }
+      
+      throw new Error('Remoto non disponibile e nessuna cache valida');
+    }
+    
+    // 2. Controlla cache locale
+    const storedFileInfo = getStoredFileInfo();
+    const cachedData = loadCachedContent();
+    
+    // 3. Determina se serve download
+    const fileChanged = hasFileChanged(currentFileInfo, storedFileInfo);
+    const cacheValid = isCacheValid();
+    const hasCachedData = cachedData && cachedData.data;
+    
+    console.log('📊 Status check:', {
+      fileChanged,
+      cacheValid,
+      hasCachedData,
+      cacheTimestamp: cachedData?.timestamp
+    });
+    
+    // 4. Usa cache se file non cambiato e cache valida
+    if (!fileChanged && cacheValid && hasCachedData) {
+      console.log('✅ File non cambiato, usando cache');
+      return {
+        datasetBuffer: cachedData.data,
+        fromCache: true,
+        cacheAge: cachedData.timestamp
+      };
+    }
+    
+    // 5. Download necessario
+    console.log('⬇️ Download necessario:', {
+      reason: fileChanged ? 'File cambiato' : !cacheValid ? 'Cache scaduta' : 'Cache non disponibile'
+    });
+    
+    const arrayBuffer = await downloadFileContent();
+    
+    // 6. Salva nella cache
+    const cacheSuccess = saveCachedContent(arrayBuffer, currentFileInfo);
+    
+    // 7. Aggiorna metadati file
+    saveFileInfo(currentFileInfo);
+    
+    console.log('✅ Dataset aggiornato con successo', {
+      size: (arrayBuffer.byteLength / 1024).toFixed(1) + 'KB',
+      cached: cacheSuccess
+    });
+    
+    return {
+      datasetBuffer: arrayBuffer,
+      fromCache: false,
+      downloadedAt: new Date().toISOString()
     };
     
-    return { arrayBuffer, fileInfo };
   } catch (error) {
-    console.error('Errore download via Netlify function:', error);
+    console.error('❌ Errore nel controllo/aggiornamento dataset:', error);
     
-    // More detailed error reporting for debugging
-    if (error.message.includes('CORS') || error.message.includes('Network error')) {
-      console.error('Network Error Details:', {
-        userAgent: navigator.userAgent,
-        origin: window.location.origin,
-        url: "/.netlify/functions/download-data"
-      });
+    // Ultimo tentativo: usa cache anche se scaduta
+    const cachedData = loadCachedContent();
+    if (cachedData && cachedData.data) {
+      console.log('📦 Usando cache scaduta come fallback');
+      return {
+        datasetBuffer: cachedData.data,
+        fromCache: true,
+        cacheAge: cachedData.timestamp,
+        expired: true
+      };
     }
     
     throw error;
@@ -140,67 +324,56 @@ export const downloadDatasetFromGitHub = async () => {
 };
 
 /**
- * Funzione principale per controllo e aggiornamento dataset
+ * Ottiene informazioni sulla cache
  */
-export const checkAndUpdateDataset = async () => {
+export const getCacheInfo = () => {
   try {
-    console.log('Controllo se il file è cambiato via Netlify functions...');
+    const cached = loadCachedContent();
+    const timestamp = localStorage.getItem(STORAGE_KEY_CACHE_TIMESTAMP);
+    const fileInfo = getStoredFileInfo();
     
-    // 1. Ottieni info file corrente via Netlify function
-    const currentFileInfo = await getFileInfo();
-    
-    // 2. Controlla se serve aggiornare
-    const storedFileInfo = getStoredFileInfo();
-    const needsUpdate = hasFileChanged(currentFileInfo, storedFileInfo);
-    
-    console.log('Info file corrente:', currentFileInfo);
-    console.log('Info file salvato:', storedFileInfo);
-    console.log('Aggiornamento necessario:', needsUpdate);
-    
-    if (needsUpdate) {
-      console.log('File cambiato, scarico la nuova versione via Netlify function...');
-      
-      // Scarica via Netlify function
-      const { arrayBuffer, fileInfo } = await downloadDatasetFromGitHub();
-      
-      // Salva info file (aggiorna con quelle del download se disponibili)
-      const finalFileInfo = {
-        ...currentFileInfo,
-        ...fileInfo // Sovrascrive con le info dal download se presenti
-      };
-      saveFileInfo(finalFileInfo);
-      
-      return {
-        datasetBuffer: arrayBuffer,
-        wasUpdated: true,
-        fileInfo: finalFileInfo
-      };
-    } else {
-      console.log('File non cambiato, uso quello in cache locale');
-      return {
-        datasetBuffer: null,
-        wasUpdated: false,
-        fileInfo: currentFileInfo
-      };
+    if (!cached || !timestamp) {
+      return { hasCache: false };
     }
     
+    const cacheDate = new Date(timestamp);
+    const now = new Date();
+    const ageHours = (now - cacheDate) / (1000 * 60 * 60);
+    
+    return {
+      hasCache: true,
+      timestamp: timestamp,
+      ageHours: ageHours,
+      isValid: ageHours < CACHE_EXPIRY_HOURS,
+      size: JSON.stringify(cached).length,
+      fileInfo: fileInfo
+    };
   } catch (error) {
-    console.error('Errore controllo aggiornamenti via Netlify functions:', error);
-    throw error;
+    console.error('Errore nel recupero info cache:', error);
+    return { hasCache: false, error: error.message };
   }
 };
 
-// Manteniamo compatibilità con le funzioni esistenti per non rompere il codice
-export const getLatestReleaseInfo = async () => {
-  const fileInfo = await getFileInfo();
-  return {
-    tagName: `File diretto ${fileInfo.timestamp}`,
-    publishedAt: fileInfo.lastModified || fileInfo.timestamp,
-    id: fileInfo.etag || fileInfo.contentLength || Date.now(),
-    downloadUrl: process.env.REACT_APP_DIRECT_FILE_URL
-  };
+/**
+ * Forza la pulizia completa della cache
+ */
+export const clearAllCache = () => {
+  try {
+    clearCachedContent();
+    localStorage.removeItem(STORAGE_KEY_LAST_FILE);
+    console.log('🧹 Tutta la cache è stata pulita');
+    return true;
+  } catch (error) {
+    console.error('Errore nella pulizia completa cache:', error);
+    return false;
+  }
 };
 
-export const getStoredReleaseInfo = getStoredFileInfo;
-export const saveReleaseInfo = saveFileInfo;
-export const hasNewRelease = hasFileChanged;
+/**
+ * Forza il re-download ignorando la cache
+ */
+export const forceRefresh = async () => {
+  console.log('🔄 Forzando refresh del dataset...');
+  clearAllCache();
+  return await checkAndUpdateDataset();
+};
