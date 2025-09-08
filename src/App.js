@@ -8,7 +8,7 @@ import { normalizePlayerData } from './utils/dataUtils';
 import { canAffordPlayer, getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
 
 // AGGIUNGIAMO L'IMPORT PER IL DOWNLOAD (necessario per il fix)
-import { checkAndUpdateDataset, downloadDatasetFromGitHub } from './utils/githubReleaseManager';
+import { checkAndUpdateDataset } from './utils/githubReleaseManager';
 
 const App = () => {
   // Stati principali
