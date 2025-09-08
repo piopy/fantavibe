@@ -5,10 +5,8 @@ import Header from './components/Header';
 import PlayersTab from './components/PlayersTab';
 import RosaAcquistata from './components/RosaAcquistata';
 import { normalizePlayerData } from './utils/dataUtils';
-import { canAffordPlayer, getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
-
-// AGGIUNGIAMO L'IMPORT PER IL DOWNLOAD (necessario per il fix)
 import { checkAndUpdateDataset } from './utils/githubReleaseManager';
+import { canAffordPlayer, getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
 
 const App = () => {
   // Stati principali
@@ -69,7 +67,7 @@ const App = () => {
     saveBudget(budget);
   }, [budget, isInitialized]);
 
-  // Caricamento automatico del file - CON FIX PER DOWNLOAD
+  // Caricamento automatico del file
   const loadDataFromPublic = async () => {
     setLoading(true);
     setError(null);
