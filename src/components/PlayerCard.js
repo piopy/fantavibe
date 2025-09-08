@@ -67,21 +67,24 @@ const PlayerCard = ({
 
   // Statistiche base (sempre visibili)
   const baseStats = [
-    { key: 'convenienza', label: 'Convenienza', value: player.convenienza?.toFixed(1) || 'N/A' },
+    { key: 'convenienza_pot', label: 'Convenienza Potenziale', value: player.convenienza?.toFixed(0) || 'N/A' },
     { key: 'fantamedia', label: 'Fantamedia', value: player.fantamedia?.toFixed(2) || 'N/A' }
   ];
 
   // Statistiche complete (visibili quando showAllStats è true)
   const allStats = [
     ...baseStats,
-    { key: 'presenze', label: 'Presenze', value: player.presenze || player['Presenze campionato corrente'] || 'N/A' },
+    { key: 'convenienza', label: 'Convenienza', value: player['Convenienza'].toFixed(2) || 'N/A' },
     { key: 'punteggio', label: 'Punteggio', value: player.punteggio || player.Punteggio || 'N/A' },
-    { key: 'gol', label: 'Gol', value: player.Gol || 'N/A' },
-    { key: 'assist', label: 'Assist', value: player.Assist || 'N/A' },
-    { key: 'ammonizioni', label: 'Ammoniz.', value: player.Ammonizioni || 'N/A' },
-    { key: 'espulsioni', label: 'Espuls.', value: player.Espulsioni || 'N/A' },
-    { key: 'quotazione', label: 'Quotazione', value: player.Quotazione || 'N/A' },
-    { key: 'differenza', label: 'Diff. Quot.', value: player['Differenza quotazione'] || 'N/A' }
+    { key: 'presenze_previste', label: 'Presenze Previste', value: player['Presenze previste'] || 'N/A' },
+    { key: 'presenze', label: 'Presenze AP', value: player.presenze || player['Presenze campionato corrente'] || 'N/A' },
+    { key: 'gol', label: 'Gol Previsti', value: player['Gol previsti'] || 'N/A' },
+    { key: 'assist', label: 'Assist Previsti', value: player['Assist previsti'] || 'N/A' },
+    { key: 'buon_investimento', label: 'Buon Investimento', value: player['Buon investimento'] || 'N/A' },
+    { key: 'resistenza', label: 'Resistenza Infortuni', value: player['Resistenza infortuni'] || 'N/A' },
+    { key: 'nuovo_acquisto', label: 'Nuovo Acquisto', value: player['Nuovo acquisto'] === 'true' ? 'SI' : 'NO' || 'N/A' },
+    { key: 'consigliato_prox', label: 'Consigliato Prossima Giornata', value: player['Consigliato prossima giornata'] === 'true'  ? 'SI' : 'NO' || 'N/A' },
+    // { key: 'partite_giocate', label: 'Partite Giocate', value: player['Partite giocate'] || 'N/A' },
   ];
 
   const statsToShow = showAllStats ? allStats : baseStats;
@@ -236,6 +239,8 @@ const PlayerCard = ({
     gap: '0.25rem'
   };
 
+  const trend = player.Trend === 'UP' ? '📈 ' : player.Trend === 'DOWN' ? '📉 ' : player.Trend === 'STABLE' ? '🟰 ' : '';
+
   return (
     <div style={enhancedCardStyle}>
       {/* Badge infortunio - Solo se il giocatore è infortunato */}
@@ -248,7 +253,7 @@ const PlayerCard = ({
       {/* Header con nome, squadra e ruolo */}
       <div style={headerStyle}>
         <div style={{ flex: 1, paddingTop: isInjured ? '1.2rem' : '0' }}>
-          <h3 style={nameStyle}>{player.Nome}</h3>
+          <h3 style={nameStyle}>{trend}{player.Nome}</h3>
           <div style={teamStyle}>{player.Squadra}</div>
         </div>
         
