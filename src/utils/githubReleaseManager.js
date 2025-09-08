@@ -1,32 +1,33 @@
-// utils/githubReleaseManager.js
-
 const STORAGE_KEY_LAST_FILE = 'fantavibe_last_file_info';
 
 /**
- * Ottiene l'ETag o altre info di cache del file diretto
+ * Ottiene l'ETag o altre info di cache del file
  */
 export const getFileInfo = async () => {
   try {
-    // Facciamo una richiesta HEAD per ottenere solo gli headers
-    const response = await fetch(process.env.REACT_APP_DIRECT_FILE_URL, {
-      method: 'HEAD',
-      headers: {
-        'User-Agent': 'FantaVibe-App'
-      }
+    console.log('Getting file info via Netlify function...');
+    
+    // Chiamata alla Netlify function invece del fetch diretto
+    const response = await fetch("/.netlify/functions/get-file-info", {
+      method: "GET",
+      credentials: 'omit', // Explicitly omit credentials
+      cache: 'no-cache'
     });
     
     if (!response.ok) {
-      throw new Error(`File check error: ${response.status}`);
+      if (response.status === 0) {
+        throw new Error('Network error or function not accessible');
+      }
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`File check error: ${response.status} - ${errorData.error || response.statusText}`);
     }
     
-    return {
-      etag: response.headers.get('etag') || response.headers.get('ETag'),
-      lastModified: response.headers.get('last-modified') || response.headers.get('Last-Modified'),
-      contentLength: response.headers.get('content-length') || response.headers.get('Content-Length'),
-      timestamp: new Date().toISOString()
-    };
+    const fileInfo = await response.json();
+    console.log('✅ File info retrieved via Netlify function:', fileInfo);
+    
+    return fileInfo;
   } catch (error) {
-    console.error('Errore nel controllo del file:', error);
+    console.error('Errore nel controllo del file via Netlify function:', error);
     throw error;
   }
 };
@@ -89,22 +90,20 @@ export const hasFileChanged = (currentFileInfo, storedFileInfo) => {
 /**
  * Scarica il dataset direttamente dall'URL specificato
  * Versione ottimizzata per compatibilità CORS con Firefox
+ * Continua ad usare la funzione download-data esistente
  */
 export const downloadDatasetFromGitHub = async () => {
   try {
-    console.log('Scaricando direttamente da:', process.env.REACT_APP_DIRECT_FILE_URL);
+    console.log('Scaricando direttamente via Netlify function...');
     
-    // Optimized fetch request to avoid triggering unnecessary preflight
+    // Usa la funzione Netlify esistente per il download
     const response = await fetch("/.netlify/functions/download-data", {
       method: "GET",
-      // Remove any headers that might trigger preflight in Firefox
-      // Keep it simple to avoid CORS preflight issues
-      credentials: 'omit', // Explicitly omit credentials
+      credentials: 'omit',
       cache: 'no-cache'
     });
     
     if (!response.ok) {
-      // Enhanced error reporting for CORS issues
       if (response.status === 0) {
         throw new Error('Network error or CORS blocked the request');
       }
@@ -113,7 +112,7 @@ export const downloadDatasetFromGitHub = async () => {
     
     // Directly get arrayBuffer since Netlify will decode base64 for us
     const arrayBuffer = await response.arrayBuffer();
-    console.log('✅ Download riuscito:', arrayBuffer.byteLength, 'bytes');
+    console.log('✅ Download riuscito via Netlify function:', arrayBuffer.byteLength, 'bytes');
     
     // Ottieni anche le info del file dalla risposta
     const fileInfo = {
@@ -125,11 +124,11 @@ export const downloadDatasetFromGitHub = async () => {
     
     return { arrayBuffer, fileInfo };
   } catch (error) {
-    console.error('Errore download diretto:', error);
+    console.error('Errore download via Netlify function:', error);
     
-    // More detailed error reporting for CORS debugging
+    // More detailed error reporting for debugging
     if (error.message.includes('CORS') || error.message.includes('Network error')) {
-      console.error('CORS Error Details:', {
+      console.error('Network Error Details:', {
         userAgent: navigator.userAgent,
         origin: window.location.origin,
         url: "/.netlify/functions/download-data"
@@ -145,9 +144,9 @@ export const downloadDatasetFromGitHub = async () => {
  */
 export const checkAndUpdateDataset = async () => {
   try {
-    console.log('Controllo se il file è cambiato...');
+    console.log('Controllo se il file è cambiato via Netlify functions...');
     
-    // 1. Ottieni info file corrente
+    // 1. Ottieni info file corrente via Netlify function
     const currentFileInfo = await getFileInfo();
     
     // 2. Controlla se serve aggiornare
@@ -159,18 +158,22 @@ export const checkAndUpdateDataset = async () => {
     console.log('Aggiornamento necessario:', needsUpdate);
     
     if (needsUpdate) {
-      console.log('File cambiato, scarico la nuova versione...');
+      console.log('File cambiato, scarico la nuova versione via Netlify function...');
       
-      // Scarica direttamente
+      // Scarica via Netlify function
       const { arrayBuffer, fileInfo } = await downloadDatasetFromGitHub();
       
-      // Salva info file
-      saveFileInfo(fileInfo);
+      // Salva info file (aggiorna con quelle del download se disponibili)
+      const finalFileInfo = {
+        ...currentFileInfo,
+        ...fileInfo // Sovrascrive con le info dal download se presenti
+      };
+      saveFileInfo(finalFileInfo);
       
       return {
         datasetBuffer: arrayBuffer,
         wasUpdated: true,
-        fileInfo: fileInfo
+        fileInfo: finalFileInfo
       };
     } else {
       console.log('File non cambiato, uso quello in cache locale');
@@ -182,7 +185,7 @@ export const checkAndUpdateDataset = async () => {
     }
     
   } catch (error) {
-    console.error('Errore controllo aggiornamenti:', error);
+    console.error('Errore controllo aggiornamenti via Netlify functions:', error);
     throw error;
   }
 };
