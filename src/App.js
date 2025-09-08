@@ -76,7 +76,7 @@ const App = () => {
       console.log('🚀 Avvio caricamento dati con sistema cache avanzato...');
 
       const result = await checkAndUpdateDataset();
-      const { datasetBuffer, wasUpdated, source, fileInfo } = result;
+      const { datasetBuffer, wasUpdated, source } = result;
       
       // Processa il file Excel
       const workbook = XLSX.read(datasetBuffer, { type: "binary" });
