@@ -6,7 +6,13 @@ import {
   getTotalFantamilioni
 } from '../utils/storage';
 
-const Header = ({ dataCount = 0, playerStatus = {}, budget = 500, onBudgetChange }) => {
+const Header = ({ 
+  dataCount = 0, 
+  playerStatus = {}, 
+  budget = 500, 
+  onBudgetChange,
+  dataUpdateInfo = null  // Nuovo prop per informazioni aggiornamento dati
+}) => {
   const totalFantamilioni = getTotalFantamilioni(playerStatus);
   const acquiredPlayers = getAcquiredPlayers(playerStatus);
   const totalAcquired = acquiredPlayers.length;
@@ -16,6 +22,65 @@ const Header = ({ dataCount = 0, playerStatus = {}, budget = 500, onBudgetChange
   const unavailablePlayers = Object.values(playerStatus).filter(
     status => status.status === 'unavailable'
   ).length;
+
+  // Formatta la data di aggiornamento
+  const formatUpdateDate = (updateInfo) => {
+    if (!updateInfo || !updateInfo.fileInfo) return null;
+    
+    const { fileInfo, source } = updateInfo;
+    
+    // Determina quale data usare
+    let dateString = null;
+    if (fileInfo.lastModified) {
+      dateString = fileInfo.lastModified;
+    } else if (fileInfo.timestamp) {
+      dateString = fileInfo.timestamp;
+    }
+    
+    if (!dateString) return null;
+    
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      
+      // Icone per diversi tipi di source
+      const sourceIcons = {
+        'github': '🔄',
+        'cache': '📦',
+        'cache_fallback': '⚠️',
+        'public_fallback': '🚨'
+      };
+      
+      const sourceIcon = sourceIcons[source] || '📅';
+      
+      // Formato relativo per date recenti
+      if (diffMinutes < 60) {
+        return `${sourceIcon} ${diffMinutes}min fa`;
+      } else if (diffHours < 24) {
+        return `${sourceIcon} ${diffHours}h fa`;
+      } else if (diffDays === 1) {
+        return `${sourceIcon} ieri`;
+      } else if (diffDays < 7) {
+        return `${sourceIcon} ${diffDays}gg fa`;
+      } else {
+        // Formato data completa per date più vecchie
+        return `${sourceIcon} ${date.toLocaleDateString('it-IT', { 
+          day: '2-digit', 
+          month: '2-digit',
+          year: '2-digit'
+        })}`;
+      }
+    } catch (error) {
+      console.error('Errore nel formato data:', error);
+      return null;
+    }
+  };
+
+  const updateDateDisplay = formatUpdateDate(dataUpdateInfo);
 
   const handleExportData = () => {
     try {
@@ -81,8 +146,21 @@ const Header = ({ dataCount = 0, playerStatus = {}, budget = 500, onBudgetChange
     gap: '0.75rem'
   };
 
+  const titleInfoStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.25rem',
+    marginTop: '0.25rem'
+  };
+
+  const dataInfoStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+    fontSize: '0.875rem'
+  };
+
   const budgetSectionStyle = {
-    marginTop: '0.5rem',
     display: 'flex',
     alignItems: 'center',
     gap: '1rem',
@@ -172,107 +250,123 @@ const Header = ({ dataCount = 0, playerStatus = {}, budget = 500, onBudgetChange
     borderColor: '#dc2626'
   };
 
+  const updateDateStyle = {
+    fontSize: '0.75rem',
+    color: '#6b7280',
+    fontWeight: '500',
+    padding: '0.125rem 0.5rem',
+    backgroundColor: '#f9fafb',
+    borderRadius: '0.375rem',
+    border: '1px solid #e5e7eb'
+  };
+
   return (
     <header style={headerStyle}>
       <div style={containerStyle}>
-        {/* Sezione sinistra - Titolo e Budget */}
+        {/* Sezione sinistra - Titolo, dati e Budget */}
         <div style={leftSectionStyle}>
           <h1 style={titleStyle}>
             ⚽ Fantavibe
-            {dataCount > 0 && (
-              <span style={{ 
-                fontSize: '0.875rem', 
-                fontWeight: 'normal', 
-                color: '#64748b',
-                backgroundColor: '#f1f5f9',
-                padding: '0.125rem 0.5rem',
-                borderRadius: '0.75rem'
-              }}>
-                {dataCount} giocator{dataCount === 1 ? 'e' : 'i'} caricat{dataCount === 1 ? 'o' : 'i'}
-              </span>
-            )}
           </h1>
           
-          {/* Gestione Budget integrata */}
-          {dataCount > 0 && (
+          <div style={titleInfoStyle}>
+            <div style={dataInfoStyle}>
+              {dataCount > 0 && (
+                <span style={{ 
+                  fontSize: '0.875rem', 
+                  fontWeight: '500', 
+                  color: '#64748b',
+                  backgroundColor: '#f1f5f9',
+                  padding: '0.125rem 0.5rem',
+                  borderRadius: '0.75rem'
+                }}>
+                  {dataCount} giocator{dataCount === 1 ? 'e' : 'i'} caricat{dataCount === 1 ? 'o' : 'i'}
+                </span>
+              )}
+              
+              {updateDateDisplay && (
+                <span style={updateDateStyle} title="Ultimo aggiornamento dati">
+                  {updateDateDisplay}
+                </span>
+              )}
+            </div>
+
             <div style={budgetSectionStyle}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <label style={{ color: '#64748b', fontWeight: '500' }}>Budget:</label>
+                <label style={{ color: '#374151', fontWeight: '500' }}>Budget:</label>
                 <input
                   type="number"
-                  min="0"
                   value={budget}
                   onChange={handleBudgetChange}
                   style={budgetInputStyle}
+                  min="0"
+                  step="1"
                 />
-                <span style={{ color: '#9ca3af' }}>FM</span>
+                <span style={{ color: '#6b7280' }}>FM</span>
               </div>
               
               <div style={budgetDisplayStyle}>
-                <span style={budgetTextStyle}>
-                  {budgetRimanente} FM disponibili
-                </span>
-                <span style={{ color: '#9ca3af' }}>
-                  ({totalFantamilioni}/{budget} FM)
-                </span>
+                <span style={{ color: '#6b7280' }}>Rimangono:</span>
+                <span style={budgetTextStyle}>{budgetRimanente} FM</span>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Statistiche centrali - solo se ci sono acquisti */}
-        {totalAcquired > 0 && (
-          <div style={statsContainerStyle}>
-            <div style={statStyle}>
-              <div style={statValueStyle}>{totalAcquired}</div>
-              <div style={statLabelStyle}>Acquisiti</div>
-            </div>
-            
-            <div style={statStyle}>
-              <div style={statValueStyle}>{unavailablePlayers}</div>
-              <div style={statLabelStyle}>Non Disponibili</div>
-            </div>
-
-            <div style={statStyle}>
-              <div style={statValueStyle}>{(totalFantamilioni / totalAcquired).toFixed(1)}</div>
-              <div style={statLabelStyle}>Media FM / Giocatore</div>
-            </div>
+        {/* Sezione centrale - Statistiche */}
+        <div style={statsContainerStyle}>
+          <div style={statStyle}>
+            <div style={statValueStyle}>{totalAcquired}</div>
+            <div style={statLabelStyle}>Acquistati</div>
           </div>
-        )}
+          
+          <div style={statStyle}>
+            <div style={statValueStyle}>{totalFantamilioni}</div>
+            <div style={statLabelStyle}>Spesi (FM)</div>
+          </div>
+          
+          <div style={statStyle}>
+            <div style={statValueStyle}>{unavailablePlayers}</div>
+            <div style={statLabelStyle}>Non Disponibili</div>
+          </div>
+          
+          <div style={statStyle}>
+            <div style={statValueStyle}>
+              {totalAcquired > 0 ? Math.round(totalFantamilioni / totalAcquired) : 0}
+            </div>
+            <div style={statLabelStyle}>Media Acquisto</div>
+          </div>
+        </div>
 
-        {/* Azioni */}
+        {/* Sezione destra - Azioni */}
         <div style={actionsStyle}>
-          {Object.keys(playerStatus).length > 0 && (
-            <>
-              <button 
-                onClick={handleExportData}
-                style={buttonStyle}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#f9fafb';
-                  e.target.style.borderColor = '#9ca3af';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'white';
-                  e.target.style.borderColor = '#d1d5db';
-                }}
-              >
-                📥 Esporta
-              </button>
-              
-              <button 
-                onClick={handleClearAll}
-                style={clearButtonStyle}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#b91c1c';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#dc2626';
-                }}
-              >
-                🗑️ Reset
-              </button>
-            </>
-          )}
+          <button
+            onClick={handleExportData}
+            style={buttonStyle}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f3f4f6';
+              e.target.style.borderColor = '#9ca3af';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'white';
+              e.target.style.borderColor = '#d1d5db';
+            }}
+          >
+            💾 Esporta
+          </button>
+          
+          <button
+            onClick={handleClearAll}
+            style={clearButtonStyle}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#b91c1c';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = '#dc2626';
+            }}
+          >
+            🗑️ Reset
+          </button>
         </div>
       </div>
     </header>

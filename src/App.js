@@ -15,6 +15,7 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('giocatori');
+  const [dataUpdateInfo, setDataUpdateInfo] = useState(null);
 
   // Stato del budget
   const [budget, setBudget] = useState(500);
@@ -40,7 +41,7 @@ const App = () => {
     // Segna come inizializzato DOPO aver caricato i dati
     setIsInitialized(true);
     
-    loadDataFromPublic();
+    loadData();
   }, []);
 
   // Salva automaticamente lo status dei giocatori
@@ -68,45 +69,52 @@ const App = () => {
   }, [budget, isInitialized]);
 
   // Caricamento automatico del file
-  const loadDataFromPublic = async () => {
+  const loadData = async () => {
     setLoading(true);
-    setError(null);
+    setError('');
     
     try {
-      // TENTATIVO 1: Prova a scaricare da GitHub
-      try {
-        console.log('🚀 Tentando download da GitHub...');
+      console.log('🚀 Avvio caricamento dati con sistema cache avanzato...');
 
-        const downloadResult = await checkAndUpdateDataset();
-        const arrayBuffer = downloadResult.datasetBuffer;
-        const workbook = XLSX.read(arrayBuffer, {type:"binary"});
-        const sheetName = workbook.SheetNames[0];
-        const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-        
-        console.log('✅ Dati scaricati da GitHub, giocatori trovati:', data?.length || 0);
-        setFpediaData(data);
-        return;
-      } catch (error) {
-        console.warn('⚠️ Download da GitHub fallito, provo file locale:', error.message);
-      }
+      const result = await checkAndUpdateDataset();
+      const { datasetBuffer, wasUpdated, source, fileInfo } = result;
+      setDataUpdateInfo({ source, fileInfo, wasUpdated, loadedAt: new Date().toISOString() });
 
-      // TENTATIVO 2: Fallback al file locale
-      console.log('📁 Caricando file locale...');
-      const fpediaResponse = await fetch('/fpedia_analysis.xlsx');
-      if (fpediaResponse.ok) {
-        const fpediaBuffer = await fpediaResponse.arrayBuffer();
-        const fpediaWorkbook = XLSX.read(fpediaBuffer);
-        const fpediaSheet = fpediaWorkbook.Sheets[fpediaWorkbook.SheetNames[0]];
-        const fpediaJson = XLSX.utils.sheet_to_json(fpediaSheet);
-        
-        console.log('✅ Dati caricati da file locale, giocatori:', fpediaJson?.length || 0);
-        setFpediaData(fpediaJson);
-      } else {
-        setError('File fpedia_analysis.xlsx non trovato nella cartella public. Verifica che il file sia presente.');
+      // Processa il file Excel
+      const workbook = XLSX.read(datasetBuffer, { type: "binary" });
+      const sheetName = workbook.SheetNames[0];
+      const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+      
+      // Log del risultato
+      const sourceMessages = {
+        'github': '✅ Dati scaricati da GitHub',
+        'cache': '📦 Dati caricati dalla cache locale',
+        'cache_fallback': '🔄 Dati caricati dalla cache (fallback)',
+        'public_fallback': '📁 Dati caricati dal file locale di fallback'
+      };
+      
+      const message = sourceMessages[source] || '✅ Dati caricati';
+      console.log(`${message}, giocatori trovati: ${data?.length || 0}`);
+      
+      if (wasUpdated) {
+        console.log('🆕 Dataset aggiornato con nuova versione');
       }
+      
+      // Mostra notifica all'utente se ha usato fallback
+      if (source === 'cache_fallback') {
+        console.warn('⚠️ Usando dati dalla cache locale (GitHub non raggiungibile)');
+        // Potresti aggiungere una notifica nell'UI qui
+      } else if (source === 'public_fallback') {
+        console.warn('🚨 Usando file di fallback locale (cache e GitHub non disponibili)');
+        setError('Attenzione: usando dati di fallback. Alcuni dati potrebbero non essere aggiornati.');
+      }
+      
+      setFpediaData(data);
+      
     } catch (err) {
-      setError('Errore nel caricamento del file. Controlla la console per maggiori dettagli.');
-      console.error('Errore caricamento automatico:', err);
+      const errorMessage = 'Errore nel caricamento del file. Tutti i metodi di caricamento hanno fallito.';
+      setError(errorMessage);
+      console.error('❌ Errore caricamento completo:', err);
     } finally {
       setLoading(false);
     }
@@ -211,13 +219,14 @@ const App = () => {
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} dataUpdateInfo={dataUpdateInfo}>
       {/* Header con Budget integrato */}
       <Header 
         dataCount={normalizedData.length}
         playerStatus={playerStatus}
         budget={budget}
         onBudgetChange={setBudget}
+        dataUpdateInfo={dataUpdateInfo}
       />
 
       {/* Navigation Tabs - solo se ci sono dati */}

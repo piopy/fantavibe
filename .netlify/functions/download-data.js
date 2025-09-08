@@ -1,6 +1,21 @@
 export async function handler(event, context) {
   const url = process.env.REACT_APP_DIRECT_FILE_URL || "";
   
+  // Handle preflight OPTIONS request for CORS (Firefox fix)
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept, User-Agent',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Max-Age': '86400', // 24 hours
+        'Vary': 'Origin'
+      },
+      body: '',
+    };
+  }
+  
   console.log('Fetching from URL:', url);
 
   if (!url) {
@@ -9,6 +24,8 @@ export async function handler(event, context) {
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Vary": "Origin"
       },
       body: JSON.stringify({ 
         error: "DIRECT_FILE_URL environment variable not configured" 
@@ -85,6 +102,8 @@ export async function handler(event, context) {
         headers: {
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          "Vary": "Origin"
         },
         body: JSON.stringify({ 
           error: "Received HTML instead of binary file. URL may be incorrect.",
@@ -106,10 +125,13 @@ export async function handler(event, context) {
     
     console.log('Downloaded buffer size:', buffer.length, 'bytes');
 
-    // Forward important headers
+    // Forward important headers with proper CORS
     const headers = {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Credentials": "false",
+      "Vary": "Origin"
     };
 
     // Forward cache-related headers if they exist
@@ -136,6 +158,8 @@ export async function handler(event, context) {
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Vary": "Origin"
       },
       body: JSON.stringify({ 
         error: error.message,
