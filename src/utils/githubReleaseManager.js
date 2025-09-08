@@ -3,8 +3,8 @@ const STORAGE_KEY_FILE_CONTENT = 'fantavibe_cached_content';
 const STORAGE_KEY_CACHE_TIMESTAMP = 'fantavibe_cache_timestamp';
 
 // Configurazione cache
-const CACHE_EXPIRY_HOURS = 24;
-const MAX_CACHE_SIZE = 5 * 1024 * 1024;
+const CACHE_EXPIRY_HOURS = 24; // Cache valida per 24 ore
+const MAX_CACHE_SIZE = 5 * 1024 * 1024; // 5MB limite per localStorage
 
 /**
  * Ottiene l'ETag o altre info di cache del file
@@ -123,8 +123,9 @@ const saveCachedContent = (data, fileInfo) => {
     timestamp: new Date().toISOString(),
     version: '1.0'
   };
-
-  try {    
+  
+  try {
+   
     const serialized = JSON.stringify(cacheData);
     
     // Controlla dimensione
@@ -245,7 +246,7 @@ export const checkAndUpdateDataset = async () => {
       if (cachedData && isCacheValid()) {
         console.log('📦 Usando dati dalla cache (remoto non disponibile)');
         return {
-          datasetBuffer: cachedData.data,
+          datasetBuffer: cachedData.data, // Ora è già un ArrayBuffer
           fromCache: true,
           cacheAge: cachedData.timestamp
         };
@@ -267,14 +268,15 @@ export const checkAndUpdateDataset = async () => {
       fileChanged,
       cacheValid,
       hasCachedData,
-      cacheTimestamp: cachedData?.timestamp
+      cacheTimestamp: cachedData?.timestamp,
+      cacheSize: cachedData?.data ? (cachedData.data.byteLength / 1024).toFixed(1) + 'KB' : 'N/A'
     });
     
     // 4. Usa cache se file non cambiato e cache valida
     if (!fileChanged && cacheValid && hasCachedData) {
       console.log('✅ File non cambiato, usando cache');
       return {
-        datasetBuffer: cachedData.data,
+        datasetBuffer: cachedData.data, // ArrayBuffer pronto all'uso
         fromCache: true,
         cacheAge: cachedData.timestamp
       };
@@ -287,7 +289,7 @@ export const checkAndUpdateDataset = async () => {
     
     const arrayBuffer = await downloadFileContent();
     
-    // 6. Salva nella cache
+    // 6. Salva nella cache (ora gestisce correttamente l'ArrayBuffer)
     const cacheSuccess = saveCachedContent(arrayBuffer, currentFileInfo);
     
     // 7. Aggiorna metadati file
@@ -312,7 +314,7 @@ export const checkAndUpdateDataset = async () => {
     if (cachedData && cachedData.data) {
       console.log('📦 Usando cache scaduta come fallback');
       return {
-        datasetBuffer: cachedData.data,
+        datasetBuffer: cachedData.data, // ArrayBuffer ripristinato dalla cache
         fromCache: true,
         cacheAge: cachedData.timestamp,
         expired: true
