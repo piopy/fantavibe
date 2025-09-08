@@ -8,7 +8,7 @@ import { normalizePlayerData } from './utils/dataUtils';
 import { canAffordPlayer, getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
 
 // AGGIUNGIAMO L'IMPORT PER IL DOWNLOAD (necessario per il fix)
-import { downloadDatasetFromGitHub } from './utils/githubReleaseManager';
+import { checkAndUpdateDataset, downloadDatasetFromGitHub } from './utils/githubReleaseManager';
 
 const App = () => {
   // Stati principali
@@ -78,7 +78,7 @@ const App = () => {
       // TENTATIVO 1: Prova a scaricare da GitHub
       try {
         console.log('🚀 Tentando download da GitHub...');
-        const downloadResult = await downloadDatasetFromGitHub();
+        const downloadResult = await checkAndUpdateDataset(); //downloadDatasetFromGitHub();
         const arrayBuffer = downloadResult.arrayBuffer; // FIX: estrai arrayBuffer dall'oggetto
         const workbook = XLSX.read(arrayBuffer);
         const sheetName = workbook.SheetNames[0];
