@@ -15,6 +15,7 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('giocatori');
+  const [dataUpdateInfo, setDataUpdateInfo] = useState(null);
 
   // Stato del budget
   const [budget, setBudget] = useState(500);
@@ -76,8 +77,9 @@ const App = () => {
       console.log('🚀 Avvio caricamento dati con sistema cache avanzato...');
 
       const result = await checkAndUpdateDataset();
-      const { datasetBuffer, wasUpdated, source } = result;
-      
+      const { datasetBuffer, wasUpdated, source, fileInfo } = result;
+      setDataUpdateInfo({ source, fileInfo, wasUpdated, loadedAt: new Date().toISOString() });
+
       // Processa il file Excel
       const workbook = XLSX.read(datasetBuffer, { type: "binary" });
       const sheetName = workbook.SheetNames[0];
@@ -217,13 +219,14 @@ const App = () => {
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} dataUpdateInfo={dataUpdateInfo}>
       {/* Header con Budget integrato */}
       <Header 
         dataCount={normalizedData.length}
         playerStatus={playerStatus}
         budget={budget}
         onBudgetChange={setBudget}
+        dataUpdateInfo={dataUpdateInfo}
       />
 
       {/* Navigation Tabs - solo se ci sono dati */}
