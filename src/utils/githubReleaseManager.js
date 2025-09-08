@@ -85,14 +85,26 @@ export const hasFileChanged = (currentFileInfo, storedFileInfo) => {
 
 /**
  * Scarica il dataset direttamente dall'URL specificato
+ * Versione ottimizzata per compatibilità CORS con Firefox
  */
 export const downloadDatasetFromGitHub = async () => {
   try {
     console.log('Scaricando direttamente da:', process.env.REACT_APP_DIRECT_FILE_URL);
-        
-    const response = await fetch("/.netlify/functions/download-data");
+    
+    // Optimized fetch request to avoid triggering unnecessary preflight
+    const response = await fetch("/.netlify/functions/download-data", {
+      method: "GET",
+      // Remove any headers that might trigger preflight in Firefox
+      // Keep it simple to avoid CORS preflight issues
+      credentials: 'omit', // Explicitly omit credentials
+      cache: 'no-cache'
+    });
     
     if (!response.ok) {
+      // Enhanced error reporting for CORS issues
+      if (response.status === 0) {
+        throw new Error('Network error or CORS blocked the request');
+      }
       throw new Error(`Download failed: ${response.status} ${response.statusText}`);
     }
     
@@ -111,6 +123,16 @@ export const downloadDatasetFromGitHub = async () => {
     return { arrayBuffer, fileInfo };
   } catch (error) {
     console.error('Errore download diretto:', error);
+    
+    // More detailed error reporting for CORS debugging
+    if (error.message.includes('CORS') || error.message.includes('Network error')) {
+      console.error('CORS Error Details:', {
+        userAgent: navigator.userAgent,
+        origin: window.location.origin,
+        url: "/.netlify/functions/download-data"
+      });
+    }
+    
     throw error;
   }
 };
