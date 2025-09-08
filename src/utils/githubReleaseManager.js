@@ -1,10 +1,5 @@
 const STORAGE_KEY_LAST_FILE = 'fantavibe_last_file_info';
-const STORAGE_KEY_FILE_CONTENT = 'fantavibe_cached_content';
-const STORAGE_KEY_CACHE_TIMESTAMP = 'fantavibe_cache_timestamp';
-
-// Configurazione cache
-const CACHE_EXPIRY_HOURS = 24; // Cache valida per 24 ore
-const MAX_CACHE_SIZE = 5 * 1024 * 1024; // 5MB limite per localStorage
+const STORAGE_KEY_FILE_CONTENT = 'fantavibe_file_content'; // NUOVO: per salvare il contenuto
 
 /**
  * Ottiene l'ETag o altre info di cache del file
@@ -13,9 +8,10 @@ export const getFileInfo = async () => {
   try {
     console.log('Getting file info via Netlify function...');
     
+    // Chiamata alla Netlify function invece del fetch diretto
     const response = await fetch("/.netlify/functions/get-file-info", {
       method: "GET",
-      credentials: 'omit',
+      credentials: 'omit', // Explicitly omit credentials
       cache: 'no-cache'
     });
     
@@ -65,6 +61,90 @@ export const saveFileInfo = (fileInfo) => {
 };
 
 /**
+ * NUOVO: Salva il contenuto del file nel localStorage
+ */
+export const saveFileContent = (arrayBuffer) => {
+  try {
+    // Converte ArrayBuffer in Base64 per salvarlo nel localStorage
+    const bytes = new Uint8Array(arrayBuffer);
+    const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+    const base64 = btoa(binary);
+    
+    const cacheData = {
+      content: base64,
+      savedAt: new Date().toISOString(),
+      size: arrayBuffer.byteLength
+    };
+    
+    localStorage.setItem(STORAGE_KEY_FILE_CONTENT, JSON.stringify(cacheData));
+    console.log(`💾 Contenuto file salvato in cache (${arrayBuffer.byteLength} bytes)`);
+  } catch (error) {
+    console.error('Errore nel salvataggio del contenuto file:', error);
+    // Se il file è troppo grande per localStorage, rimuovi la cache esistente
+    if (error.name === 'QuotaExceededError') {
+      console.warn('File troppo grande per localStorage, rimuovo cache esistente');
+      localStorage.removeItem(STORAGE_KEY_FILE_CONTENT);
+    }
+  }
+};
+
+/**
+ * NUOVO: Carica il contenuto del file dal localStorage
+ */
+export const getStoredFileContent = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_FILE_CONTENT);
+    if (!stored) return null;
+    
+    const cacheData = JSON.parse(stored);
+    
+    // Controlla se la cache non è troppo vecchia (es. massimo 7 giorni)
+    const savedAt = new Date(cacheData.savedAt);
+    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 giorni in millisecondi
+    const isExpired = Date.now() - savedAt.getTime() > maxAge;
+    
+    if (isExpired) {
+      console.log('🕒 Cache contenuto file scaduta, rimuovo');
+      localStorage.removeItem(STORAGE_KEY_FILE_CONTENT);
+      return null;
+    }
+    
+    // Converte Base64 back ad ArrayBuffer
+    const binary = atob(cacheData.content);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    
+    console.log(`📁 Contenuto file caricato dalla cache (${bytes.buffer.byteLength} bytes)`);
+    return bytes.buffer;
+  } catch (error) {
+    console.error('Errore nel caricamento del contenuto file dalla cache:', error);
+    // Se c'è un errore, rimuovi la cache corrotta
+    localStorage.removeItem(STORAGE_KEY_FILE_CONTENT);
+    return null;
+  }
+};
+
+/**
+ * NUOVO: Controlla se la cache del contenuto è valida
+ */
+export const isCacheValid = (storedFileInfo) => {
+  if (!storedFileInfo) return false;
+  
+  // Controlla se abbiamo anche il contenuto salvato
+  const hasContent = localStorage.getItem(STORAGE_KEY_FILE_CONTENT) !== null;
+  if (!hasContent) return false;
+  
+  // Controlla se la cache non è troppo vecchia
+  const lastChecked = new Date(storedFileInfo.lastChecked || 0);
+  const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 giorni
+  const isExpired = Date.now() - lastChecked.getTime() > maxAge;
+  
+  return !isExpired;
+};
+
+/**
  * Controlla se il file è cambiato rispetto a quello salvato
  */
 export const hasFileChanged = (currentFileInfo, storedFileInfo) => {
@@ -88,237 +168,56 @@ export const hasFileChanged = (currentFileInfo, storedFileInfo) => {
     return currentFileInfo.contentLength !== storedFileInfo.contentLength;
   }
   
-  // Se non abbiamo metadati sufficienti, assumiamo che sia cambiato
+  // Se non abbiamo info sufficienti, considera cambiato
   return true;
 };
 
 /**
- * Controlla se la cache è ancora valida
+ * Scarica il dataset direttamente dall'URL specificato
+ * Versione ottimizzata per compatibilità CORS con Firefox
+ * Continua ad usare la funzione download-data esistente
  */
-const isCacheValid = () => {
+export const downloadDatasetFromGitHub = async () => {
   try {
-    const timestamp = localStorage.getItem(STORAGE_KEY_CACHE_TIMESTAMP);
-    if (!timestamp) return false;
+    console.log('Scaricando direttamente via Netlify function...');
     
-    const cacheDate = new Date(timestamp);
-    const now = new Date();
-    const hoursDiff = (now - cacheDate) / (1000 * 60 * 60);
+    // Usa la funzione Netlify esistente per il download
+    const response = await fetch("/.netlify/functions/download-data", {
+      method: "GET",
+      credentials: 'omit',
+      cache: 'no-cache'
+    });
     
-    const isValid = hoursDiff < CACHE_EXPIRY_HOURS;
-    console.log(`Cache age: ${hoursDiff.toFixed(1)} hours, valid: ${isValid}`);
-    return isValid;
-  } catch (error) {
-    console.error('Errore nel controllo validità cache:', error);
-    return false;
-  }
-};
-
-/**
- * Salva i dati del file nella cache
- */
-const saveCachedContent = (data, fileInfo) => {
-  const cacheData = {
-    data: data,
-    fileInfo: fileInfo,
-    timestamp: new Date().toISOString(),
-    version: '1.0'
-  };
-  
-  try {
-   
-    const serialized = JSON.stringify(cacheData);
-    
-    // Controlla dimensione
-    if (serialized.length > MAX_CACHE_SIZE) {
-      console.warn('⚠️ Contenuto troppo grande per la cache, skip salvataggio');
-      return false;
-    }
-    
-    localStorage.setItem(STORAGE_KEY_FILE_CONTENT, serialized);
-    localStorage.setItem(STORAGE_KEY_CACHE_TIMESTAMP, cacheData.timestamp);
-    
-    console.log('✅ Contenuto salvato nella cache, dimensione:', (serialized.length / 1024).toFixed(1), 'KB');
-    return true;
-  } catch (error) {
-    console.error('Errore nel salvataggio della cache:', error);
-    
-    // Se è un errore di quota, prova a pulire cache vecchia
-    if (error.name === 'QuotaExceededError') {
-      console.log('🧹 Tentativo di pulizia cache per spazio...');
-      clearCachedContent();
-      
-      // Riprova una volta
-      try {
-        localStorage.setItem(STORAGE_KEY_FILE_CONTENT, JSON.stringify(cacheData));
-        localStorage.setItem(STORAGE_KEY_CACHE_TIMESTAMP, cacheData.timestamp);
-        console.log('✅ Contenuto salvato nella cache dopo pulizia');
-        return true;
-      } catch (retryError) {
-        console.error('❌ Impossibile salvare nella cache anche dopo pulizia:', retryError);
+    if (!response.ok) {
+      if (response.status === 0) {
+        throw new Error('Network error or CORS blocked the request');
       }
+      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
     }
     
-    return false;
-  }
-};
-
-/**
- * Carica i dati del file dalla cache
- */
-const loadCachedContent = () => {
-  try {
-    const cached = localStorage.getItem(STORAGE_KEY_FILE_CONTENT);
-    if (!cached) {
-      console.log('📦 Nessun contenuto nella cache');
-      return null;
-    }
+    // Directly get arrayBuffer since Netlify will decode base64 for us
+    const arrayBuffer = await response.arrayBuffer();
+    console.log('✅ Download riuscito via Netlify function:', arrayBuffer.byteLength, 'bytes');
     
-    const cacheData = JSON.parse(cached);
-    
-    // Verifica struttura
-    if (!cacheData.data || !cacheData.timestamp) {
-      console.warn('⚠️ Struttura cache corrotta, rimozione...');
-      clearCachedContent();
-      return null;
-    }
-    
-    console.log('📦 Contenuto caricato dalla cache, timestamp:', cacheData.timestamp);
-    return cacheData;
-  } catch (error) {
-    console.error('Errore nel caricamento della cache:', error);
-    clearCachedContent(); // Pulisce cache corrotta
-    return null;
-  }
-};
-
-/**
- * Rimuove il contenuto dalla cache
- */
-const clearCachedContent = () => {
-  try {
-    localStorage.removeItem(STORAGE_KEY_FILE_CONTENT);
-    localStorage.removeItem(STORAGE_KEY_CACHE_TIMESTAMP);
-    console.log('🧹 Cache contenuto pulita');
-  } catch (error) {
-    console.error('Errore nella pulizia cache:', error);
-  }
-};
-
-/**
- * Scarica il file da GitHub
- */
-const downloadFileContent = async () => {
-  console.log('⬇️ Downloading file content from GitHub...');
-  
-  const response = await fetch("/.netlify/functions/download-data", {
-    method: "GET",
-    credentials: 'omit',
-    cache: 'no-cache'
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(`Download failed: ${response.status} - ${errorData.error || response.statusText}`);
-  }
-  
-  const arrayBuffer = await response.arrayBuffer();
-  console.log('✅ File downloaded, size:', (arrayBuffer.byteLength / 1024).toFixed(1), 'KB');
-  
-  return arrayBuffer;
-};
-
-/**
- * Funzione principale per gestire il download e la cache
- */
-export const checkAndUpdateDataset = async () => {
-  try {
-    console.log('🔍 Controllo aggiornamenti dataset...');
-    
-    // 1. Controlla info file remoto
-    let currentFileInfo;
-    try {
-      currentFileInfo = await getFileInfo();
-    } catch (error) {
-      console.warn('⚠️ Impossibile controllare info file remoto:', error.message);
-      
-      // Prova a usare cache se disponibile
-      const cachedData = loadCachedContent();
-      if (cachedData && isCacheValid()) {
-        console.log('📦 Usando dati dalla cache (remoto non disponibile)');
-        return {
-          datasetBuffer: cachedData.data, // Ora è già un ArrayBuffer
-          fromCache: true,
-          cacheAge: cachedData.timestamp
-        };
-      }
-      
-      throw new Error('Remoto non disponibile e nessuna cache valida');
-    }
-    
-    // 2. Controlla cache locale
-    const storedFileInfo = getStoredFileInfo();
-    const cachedData = loadCachedContent();
-    
-    // 3. Determina se serve download
-    const fileChanged = hasFileChanged(currentFileInfo, storedFileInfo);
-    const cacheValid = isCacheValid();
-    const hasCachedData = cachedData && cachedData.data;
-    
-    console.log('📊 Status check:', {
-      fileChanged,
-      cacheValid,
-      hasCachedData,
-      cacheTimestamp: cachedData?.timestamp,
-      cacheSize: cachedData?.data ? (cachedData.data.byteLength / 1024).toFixed(1) + 'KB' : 'N/A'
-    });
-    
-    // 4. Usa cache se file non cambiato e cache valida
-    if (!fileChanged && cacheValid && hasCachedData) {
-      console.log('✅ File non cambiato, usando cache');
-      return {
-        datasetBuffer: cachedData.data, // ArrayBuffer pronto all'uso
-        fromCache: true,
-        cacheAge: cachedData.timestamp
-      };
-    }
-    
-    // 5. Download necessario
-    console.log('⬇️ Download necessario:', {
-      reason: fileChanged ? 'File cambiato' : !cacheValid ? 'Cache scaduta' : 'Cache non disponibile'
-    });
-    
-    const arrayBuffer = await downloadFileContent();
-    
-    // 6. Salva nella cache (ora gestisce correttamente l'ArrayBuffer)
-    const cacheSuccess = saveCachedContent(arrayBuffer, currentFileInfo);
-    
-    // 7. Aggiorna metadati file
-    saveFileInfo(currentFileInfo);
-    
-    console.log('✅ Dataset aggiornato con successo', {
-      size: (arrayBuffer.byteLength / 1024).toFixed(1) + 'KB',
-      cached: cacheSuccess
-    });
-    
-    return {
-      datasetBuffer: arrayBuffer,
-      fromCache: false,
-      downloadedAt: new Date().toISOString()
+    // Ottieni anche le info del file dalla risposta
+    const fileInfo = {
+      etag: response.headers.get('etag') || response.headers.get('ETag'),
+      lastModified: response.headers.get('last-modified') || response.headers.get('Last-Modified'),
+      contentLength: response.headers.get('content-length') || response.headers.get('Content-Length'),
+      timestamp: new Date().toISOString()
     };
     
+    return { arrayBuffer, fileInfo };
   } catch (error) {
-    console.error('❌ Errore nel controllo/aggiornamento dataset:', error);
+    console.error('Errore download via Netlify function:', error);
     
-    // Ultimo tentativo: usa cache anche se scaduta
-    const cachedData = loadCachedContent();
-    if (cachedData && cachedData.data) {
-      console.log('📦 Usando cache scaduta come fallback');
-      return {
-        datasetBuffer: cachedData.data, // ArrayBuffer ripristinato dalla cache
-        fromCache: true,
-        cacheAge: cachedData.timestamp,
-        expired: true
-      };
+    // More detailed error reporting for debugging
+    if (error.message.includes('CORS') || error.message.includes('Network error')) {
+      console.error('Network Error Details:', {
+        userAgent: navigator.userAgent,
+        origin: window.location.origin,
+        url: "/.netlify/functions/download-data"
+      });
     }
     
     throw error;
@@ -326,56 +225,153 @@ export const checkAndUpdateDataset = async () => {
 };
 
 /**
- * Ottiene informazioni sulla cache
+ * NUOVO: Carica il file da public come fallback finale
  */
-export const getCacheInfo = () => {
+export const loadFromPublicFallback = async () => {
   try {
-    const cached = loadCachedContent();
-    const timestamp = localStorage.getItem(STORAGE_KEY_CACHE_TIMESTAMP);
-    const fileInfo = getStoredFileInfo();
+    console.log('📁 Caricando file di fallback da public...');
+    const response = await fetch('/fpedia_analysis.xlsx');
     
-    if (!cached || !timestamp) {
-      return { hasCache: false };
+    if (!response.ok) {
+      throw new Error(`File pubblico non trovato: ${response.status}`);
     }
     
-    const cacheDate = new Date(timestamp);
-    const now = new Date();
-    const ageHours = (now - cacheDate) / (1000 * 60 * 60);
+    const arrayBuffer = await response.arrayBuffer();
+    console.log('✅ File caricato da public:', arrayBuffer.byteLength, 'bytes');
     
-    return {
-      hasCache: true,
-      timestamp: timestamp,
-      ageHours: ageHours,
-      isValid: ageHours < CACHE_EXPIRY_HOURS,
-      size: JSON.stringify(cached).length,
-      fileInfo: fileInfo
-    };
+    return arrayBuffer;
   } catch (error) {
-    console.error('Errore nel recupero info cache:', error);
-    return { hasCache: false, error: error.message };
+    console.error('Errore caricamento file da public:', error);
+    throw error;
   }
 };
 
 /**
- * Forza la pulizia completa della cache
+ * AGGIORNATA: Funzione principale per controllo e aggiornamento dataset
+ * Ora con logica di cache del contenuto e fallback multipli
  */
-export const clearAllCache = () => {
+export const checkAndUpdateDataset = async () => {
   try {
-    clearCachedContent();
-    localStorage.removeItem(STORAGE_KEY_LAST_FILE);
-    console.log('🧹 Tutta la cache è stata pulita');
-    return true;
+    console.log('🔄 Avvio controllo dataset con cache avanzata...');
+    
+    // 1. Prova a ottenere info file corrente da GitHub
+    let currentFileInfo = null;
+    let canCheckGitHub = true;
+    
+    try {
+      currentFileInfo = await getFileInfo();
+    } catch (error) {
+      console.warn('⚠️ Non riesco a controllare GitHub:', error.message);
+      canCheckGitHub = false;
+    }
+    
+    // 2. Carica info file salvato e controlla cache
+    const storedFileInfo = getStoredFileInfo();
+    console.log('Info file corrente:', currentFileInfo);
+    console.log('Info file salvato:', storedFileInfo);
+    
+    // 3. Determina se serve scaricare
+    let needsDownload = true;
+    
+    if (canCheckGitHub && currentFileInfo && storedFileInfo) {
+      needsDownload = hasFileChanged(currentFileInfo, storedFileInfo);
+      console.log('File cambiato:', needsDownload);
+    } else if (!canCheckGitHub && storedFileInfo) {
+      // Se non posso controllare GitHub, uso la cache se valida
+      const cacheIsValid = isCacheValid(storedFileInfo);
+      needsDownload = !cacheIsValid;
+      console.log('Cache valida (GitHub non raggiungibile):', cacheIsValid);
+    }
+    
+    // 4. Se non serve scaricare, prova a usare la cache
+    if (!needsDownload) {
+      console.log('📦 Uso contenuto dalla cache...');
+      const cachedContent = getStoredFileContent();
+      
+      if (cachedContent) {
+        return {
+          datasetBuffer: cachedContent,
+          wasUpdated: false,
+          source: 'cache',
+          fileInfo: storedFileInfo
+        };
+      } else {
+        console.log('⚠️ Cache info presente ma contenuto mancante, forzo download');
+        needsDownload = true;
+      }
+    }
+    
+    // 5. Prova a scaricare da GitHub
+    if (needsDownload && canCheckGitHub) {
+      try {
+        console.log('⬇️ Scarico nuova versione da GitHub...');
+        const { arrayBuffer, fileInfo } = await downloadDatasetFromGitHub();
+        
+        // Salva sia le info che il contenuto
+        const finalFileInfo = {
+          ...currentFileInfo,
+          ...fileInfo
+        };
+        saveFileInfo(finalFileInfo);
+        saveFileContent(arrayBuffer);
+        
+        return {
+          datasetBuffer: arrayBuffer,
+          wasUpdated: true,
+          source: 'github',
+          fileInfo: finalFileInfo
+        };
+      } catch (downloadError) {
+        console.warn('⚠️ Download da GitHub fallito:', downloadError.message);
+        // Continua con i fallback...
+      }
+    }
+    
+    // 6. FALLBACK 1: Prova a usare cache esistente (anche se "scaduta")
+    if (storedFileInfo) {
+      console.log('🔄 Tentativo fallback: uso cache esistente...');
+      const cachedContent = getStoredFileContent();
+      
+      if (cachedContent) {
+        console.log('✅ Usando cache esistente come fallback');
+        return {
+          datasetBuffer: cachedContent,
+          wasUpdated: false,
+          source: 'cache_fallback',
+          fileInfo: storedFileInfo
+        };
+      }
+    }
+    
+    // 7. FALLBACK 2: Carica da public
+    console.log('🚨 Ultimo tentativo: carico da cartella public...');
+    const publicArrayBuffer = await loadFromPublicFallback();
+    
+    // Non salviamo la cache per il file da public perché è un fallback
+    return {
+      datasetBuffer: publicArrayBuffer,
+      wasUpdated: false,
+      source: 'public_fallback',
+      fileInfo: null
+    };
+    
   } catch (error) {
-    console.error('Errore nella pulizia completa cache:', error);
-    return false;
+    console.error('❌ Tutti i tentativi di caricamento falliti:', error);
+    throw new Error(`Impossibile caricare il dataset: ${error.message}`);
   }
 };
 
-/**
- * Forza il re-download ignorando la cache
- */
-export const forceRefresh = async () => {
-  console.log('🔄 Forzando refresh del dataset...');
-  clearAllCache();
-  return await checkAndUpdateDataset();
+// Manteniamo compatibilità con le funzioni esistenti per non rompere il codice
+export const getLatestReleaseInfo = async () => {
+  const fileInfo = await getFileInfo();
+  return {
+    tagName: `File diretto ${fileInfo.timestamp}`,
+    publishedAt: fileInfo.lastModified || fileInfo.timestamp,
+    id: fileInfo.etag || fileInfo.contentLength || Date.now(),
+    downloadUrl: process.env.REACT_APP_DIRECT_FILE_URL
+  };
 };
+
+export const getStoredReleaseInfo = getStoredFileInfo;
+export const saveReleaseInfo = saveFileInfo;
+export const hasNewRelease = hasFileChanged;
