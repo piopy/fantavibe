@@ -66,16 +66,19 @@ export const hasFileChanged = (currentFileInfo, storedFileInfo) => {
   
   // Controlla prima l'ETag (più affidabile)
   if (currentFileInfo.etag && storedFileInfo.etag) {
+    console.log('Confronto ETag: ', currentFileInfo.etag !== storedFileInfo.etag);
     return currentFileInfo.etag !== storedFileInfo.etag;
   }
   
   // Fallback su Last-Modified
   if (currentFileInfo.lastModified && storedFileInfo.lastModified) {
+    console.log('Confronto Last-Modified: ', currentFileInfo.lastModified !== storedFileInfo.lastModified);
     return currentFileInfo.lastModified !== storedFileInfo.lastModified;
   }
   
   // Fallback su Content-Length
   if (currentFileInfo.contentLength && storedFileInfo.contentLength) {
+    console.log('Confronto Content-Length: ', currentFileInfo.contentLength !== storedFileInfo.contentLength);
     return currentFileInfo.contentLength !== storedFileInfo.contentLength;
   }
   
