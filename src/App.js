@@ -76,17 +76,18 @@ const App = () => {
       // TENTATIVO 1: Prova a scaricare da GitHub
       try {
         console.log('🚀 Tentando download da GitHub...');
-        const downloadResult = await checkAndUpdateDataset(); //downloadDatasetFromGitHub();
-        const arrayBuffer = downloadResult.arrayBuffer; // FIX: estrai arrayBuffer dall'oggetto
-        const workbook = XLSX.read(arrayBuffer);
+
+        const downloadResult = await checkAndUpdateDataset();
+        const arrayBuffer = downloadResult.datasetBuffer;
+        const workbook = XLSX.read(arrayBuffer, {type:"binary"});
         const sheetName = workbook.SheetNames[0];
         const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
         
         console.log('✅ Dati scaricati da GitHub, giocatori trovati:', data?.length || 0);
         setFpediaData(data);
-        return; // Successo, esci dalla funzione
-      } catch (downloadError) {
-        console.warn('⚠️ Download da GitHub fallito, provo file locale:', downloadError.message);
+        return;
+      } catch (error) {
+        console.warn('⚠️ Download da GitHub fallito, provo file locale:', error.message);
       }
 
       // TENTATIVO 2: Fallback al file locale
