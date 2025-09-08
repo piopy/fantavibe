@@ -5,6 +5,7 @@ import Header from './components/Header';
 import PlayersTab from './components/PlayersTab';
 import RosaAcquistata from './components/RosaAcquistata';
 import { normalizePlayerData } from './utils/dataUtils';
+import { checkAndUpdateDataset } from './utils/githubReleaseManager';
 import { canAffordPlayer, getTotalFantamilioni, loadBudget, loadPlayerStatus, saveBudget, savePlayerStatus, updatePlayerStatus } from './utils/storage';
 
 const App = () => {
@@ -66,25 +67,44 @@ const App = () => {
     saveBudget(budget);
   }, [budget, isInitialized]);
 
-  // Caricamento automatico del file dalla cartella public
+  // Caricamento automatico del file
   const loadDataFromPublic = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Carica solo FPEDIA
+      // TENTATIVO 1: Prova a scaricare da GitHub
+      try {
+        console.log('🚀 Tentando download da GitHub...');
+        const downloadResult = await checkAndUpdateDataset(); //downloadDatasetFromGitHub();
+        const arrayBuffer = downloadResult.arrayBuffer; // FIX: estrai arrayBuffer dall'oggetto
+        const workbook = XLSX.read(arrayBuffer);
+        const sheetName = workbook.SheetNames[0];
+        const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        
+        console.log('✅ Dati scaricati da GitHub, giocatori trovati:', data?.length || 0);
+        setFpediaData(data);
+        return; // Successo, esci dalla funzione
+      } catch (downloadError) {
+        console.warn('⚠️ Download da GitHub fallito, provo file locale:', downloadError.message);
+      }
+
+      // TENTATIVO 2: Fallback al file locale
+      console.log('📁 Caricando file locale...');
       const fpediaResponse = await fetch('/fpedia_analysis.xlsx');
       if (fpediaResponse.ok) {
         const fpediaBuffer = await fpediaResponse.arrayBuffer();
         const fpediaWorkbook = XLSX.read(fpediaBuffer);
         const fpediaSheet = fpediaWorkbook.Sheets[fpediaWorkbook.SheetNames[0]];
         const fpediaJson = XLSX.utils.sheet_to_json(fpediaSheet);
+        
+        console.log('✅ Dati caricati da file locale, giocatori:', fpediaJson?.length || 0);
         setFpediaData(fpediaJson);
       } else {
-        setError('File fpedia_analysis.xlsx non trovato nella cartella public. Usa il caricamento manuale.');
+        setError('File fpedia_analysis.xlsx non trovato nella cartella public. Verifica che il file sia presente.');
       }
     } catch (err) {
-      setError('Errore nel caricamento del file. Usa il caricamento manuale.');
+      setError('Errore nel caricamento del file. Controlla la console per maggiori dettagli.');
       console.error('Errore caricamento automatico:', err);
     } finally {
       setLoading(false);

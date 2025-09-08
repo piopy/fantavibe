@@ -114,7 +114,7 @@ const FantamilioniModal = ({
   };
 
   const inputStyle = {
-    width: '100%',
+    width: '93%',
     padding: '12px',
     border: `2px solid ${error ? '#f87171' : '#d1d5db'}`,
     borderRadius: '8px',

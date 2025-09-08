@@ -23,6 +23,12 @@ const PlayersTab = ({
     { key: 'ATT', label: 'Attaccanti', emoji: '⚽' }
   ];
 
+  const rolesDescription = (roleKey) => {
+    const role = roles.find(r => r.key === roleKey);
+    if (!role) return '';
+    return role.label;
+  }
+
   // Risultati in base al contesto (ricerca vs classifiche)
   const displayedPlayers = useMemo(() => {
     // Protezione per dati non ancora caricati
@@ -303,7 +309,7 @@ const PlayersTab = ({
         <div style={searchContainerStyle}>
           <input
             type="text"
-            placeholder="Cerca giocatore per nome..."
+            placeholder="Cerca giocatore per nome, squadra, infortunato..."
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
             style={searchInputStyle}
@@ -368,7 +374,7 @@ const PlayersTab = ({
               </div>
               <div style={statLabelStyle}>
                 {isSearchMode 
-                  ? `Risultat${displayedPlayers.length === 1 ? 'o' : 'i'} ${selectedRole}`
+                  ? `Risultat${displayedPlayers.length === 1 ? 'o' : 'i'}`
                   : `Totale ${roles.find(r => r.key === selectedRole)?.label}`
                 }
               </div>
@@ -380,7 +386,7 @@ const PlayersTab = ({
                   {roleStats.avgConvenienza}
                 </div>
                 <div style={statLabelStyle}>
-                  Convenienza Media
+                  Convenienza Pot. Media
                 </div>
               </div>
             )}
@@ -480,10 +486,10 @@ const PlayersTab = ({
             </div>
             <p style={{ fontSize: '1.1rem', marginBottom: '0.5rem', color: '#374151' }}>
               {isSearchMode 
-                ? `Nessun giocatore ${selectedRole} trovato per "${searchTerm}"`
+                ? `Nessun giocatore trovato per "${searchTerm}"`
                 : !players || !players.length 
                   ? 'Nessun dato caricato' 
-                  : `Nessun giocatore trovato per il ruolo ${selectedRole}`
+                  : `Nessun giocatore trovato per il ruolo '${selectedRole}'`
               }
             </p>
             <p style={{ color: '#9ca3af' }}>
@@ -513,7 +519,7 @@ const PlayersTab = ({
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
           zIndex: 100
         }}>
-          {roles.find(r => r.key === selectedRole)?.emoji} {selectedRole}
+          {roles.find(r => r.key === selectedRole)?.emoji} {rolesDescription(selectedRole)}
           {isSearchMode && ` • ${displayedPlayers.length} risultati`}
           {!isSearchMode && ` • ${roleStats.total} totali`}
           {displayedPlayers.length > 0 && displayedPlayers[0].originalRank && (

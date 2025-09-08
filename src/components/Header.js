@@ -188,7 +188,7 @@ const Header = ({ dataCount = 0, playerStatus = {}, budget = 500, onBudgetChange
                 padding: '0.125rem 0.5rem',
                 borderRadius: '0.75rem'
               }}>
-                {dataCount} giocatori
+                {dataCount} giocator{dataCount === 1 ? 'e' : 'i'} caricat{dataCount === 1 ? 'o' : 'i'}
               </span>
             )}
           </h1>
@@ -210,7 +210,7 @@ const Header = ({ dataCount = 0, playerStatus = {}, budget = 500, onBudgetChange
               
               <div style={budgetDisplayStyle}>
                 <span style={budgetTextStyle}>
-                  {budgetRimanente}FM disponibili
+                  {budgetRimanente} FM disponibili
                 </span>
                 <span style={{ color: '#9ca3af' }}>
                   ({totalFantamilioni}/{budget} FM)
@@ -230,12 +230,12 @@ const Header = ({ dataCount = 0, playerStatus = {}, budget = 500, onBudgetChange
             
             <div style={statStyle}>
               <div style={statValueStyle}>{unavailablePlayers}</div>
-              <div style={statLabelStyle}>Non Disp.</div>
+              <div style={statLabelStyle}>Non Disponibili</div>
             </div>
 
             <div style={statStyle}>
               <div style={statValueStyle}>{(totalFantamilioni / totalAcquired).toFixed(1)}</div>
-              <div style={statLabelStyle}>Media FM</div>
+              <div style={statLabelStyle}>Media FM / Giocatore</div>
             </div>
           </div>
         )}
