@@ -309,7 +309,7 @@ const PlayersTab = ({
         <div style={searchContainerStyle}>
           <input
             type="text"
-            placeholder="Cerca giocatore per nome..."
+            placeholder="Cerca giocatore per nome, squadra, infortunato..."
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
             style={searchInputStyle}

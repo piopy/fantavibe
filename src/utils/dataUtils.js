@@ -41,15 +41,30 @@ const createSearchIndex = (players) => {
   const index = new Map();
   
   players.forEach((player, idx) => {
-    const normalizedName = normalizeName(player.Nome);
-    const words = normalizedName.split(' ');
-    
+    const normalizedName = normalizeName(player.Nome);    
+    const normalizedSquadra = normalizeName(player.Squadra);
+
+    const words = normalizedName.split(' ')
+      .concat(normalizedSquadra.split(' '));
+
+    if (player.Infortunato === 'true') {
+      words.push('infortunato');
+    }
+
+    // Indicizza squadra normalizzata
+    if (normalizedSquadra && normalizedSquadra.length > 2) {
+      if (!index.has(normalizedSquadra)) {
+      index.set(normalizedSquadra, []);
+      }
+      index.get(normalizedSquadra).push(idx);
+    }
+
     // Indicizza nome completo
     if (!index.has(normalizedName)) {
       index.set(normalizedName, []);
     }
     index.get(normalizedName).push(idx);
-    
+
     // Indicizza ogni parola singolarmente
     words.forEach(word => {
       if (word.length > 2) { // Solo parole significative

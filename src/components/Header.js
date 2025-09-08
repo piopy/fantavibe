@@ -188,7 +188,7 @@ const Header = ({ dataCount = 0, playerStatus = {}, budget = 500, onBudgetChange
                 padding: '0.125rem 0.5rem',
                 borderRadius: '0.75rem'
               }}>
-                {dataCount} giocator{dataCount == 1 ? 'e' : 'i'} caricat{dataCount == 1 ? 'o' : 'i'}
+                {dataCount} giocator{dataCount === 1 ? 'e' : 'i'} caricat{dataCount === 1 ? 'o' : 'i'}
               </span>
             )}
           </h1>

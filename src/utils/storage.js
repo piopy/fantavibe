@@ -234,7 +234,7 @@ export const exportPlayerStatus = (playerStatus, playersData = [], budget = null
   const safePlayerStatus = playerStatus || {};
   
   const exportData = {
-    version: '2.1', // AGGIORNATO per includere budget
+    version: '2.1',
     timestamp: new Date().toISOString(),
     data: safePlayerStatus,
     budget: budget || loadBudget(), // AGGIUNTO
