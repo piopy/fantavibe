@@ -244,7 +244,7 @@ const RosaAcquistata = ({
                   {roleData.name}
                 </div>
                 <div style={roleStatsStyle}>
-                  <span>{roleStats.count} giocatori</span>
+                  <span>{roleStats.count} giocator{roleStats.count === 1 ? 'e' : 'i'}</span>
                   {roleStats.total > 0 && (
                     <span>• {roleStats.total} FM</span>
                   )}
@@ -255,7 +255,7 @@ const RosaAcquistata = ({
               <div style={playersListStyle}>
                 {roleStats.players.length === 0 ? (
                   <div style={emptyRoleStyle}>
-                    Nessun {roleData.name.toLowerCase()} acquistato
+                    Nessun giocatore acquistato
                   </div>
                 ) : (
                   roleStats.players.map((player, index) => (
