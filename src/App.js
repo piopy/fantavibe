@@ -27,6 +27,9 @@ const App = () => {
   const [showFantamilioniModal, setShowFantamilioniModal] = useState(false);
   const [playerToAcquire, setPlayerToAcquire] = useState(null);
 
+  // Stato per preservare la selezione del ruolo tra i cambi di tab
+  const [selectedRole, setSelectedRole] = useState('POR');
+
   // Carica status giocatori all'avvio
   useEffect(() => {
     const status = loadPlayerStatus();
@@ -314,6 +317,8 @@ const App = () => {
                 onPlayerStatusChange={handlePlayerStatusChange}
                 onPlayerAcquire={handlePlayerAcquire}
                 searchIndex={searchIndex}
+                selectedRole={selectedRole}
+                onRoleChange={setSelectedRole}
               />
             )}
 

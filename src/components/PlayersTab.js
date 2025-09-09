@@ -8,11 +8,12 @@ const PlayersTab = ({
   searchIndex = null,
   playerStatus, 
   onPlayerStatusChange,
-  onPlayerAcquire
+  onPlayerAcquire,
+  selectedRole = 'POR',
+  onRoleChange
 }) => {
   // Stati principali - SEMPRE dichiarati per rispettare rules of hooks
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRole, setSelectedRole] = useState('POR');
   const [showDetailedMode, setShowDetailedMode] = useState(false);
 
   // Ruoli disponibili
@@ -68,7 +69,9 @@ const PlayersTab = ({
   };
 
   const handleRoleChange = (roleKey) => {
-    setSelectedRole(roleKey);
+    if (onRoleChange) {
+      onRoleChange(roleKey);
+    }
   };
 
   const handleToggleDetailedMode = () => {
