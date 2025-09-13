@@ -32,6 +32,7 @@ const RosaAcquistata = ({
       POR: { players: [], count: 0, total: 0 },
       DIF: { players: [], count: 0, total: 0 },
       CEN: { players: [], count: 0, total: 0 },
+      TRQ: { players: [], count: 0, total: 0 },
       ATT: { players: [], count: 0, total: 0 }
     };
 
@@ -187,6 +188,7 @@ const RosaAcquistata = ({
     POR: { emoji: '🥅', name: 'Portieri' },
     DIF: { emoji: '🛡️', name: 'Difensori' },
     CEN: { emoji: '🎯', name: 'Centrocampisti' },
+    TRQ: { emoji: '🎨', name: 'Trequartisti' },
     ATT: { emoji: '⚽', name: 'Attaccanti' }
   };
 

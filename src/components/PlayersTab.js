@@ -20,7 +20,8 @@ const PlayersTab = ({
   const roles = [
     { key: 'POR', label: 'Portieri', emoji: '🥅' },
     { key: 'DIF', label: 'Difensori', emoji: '🛡️' },
-    { key: 'CEN', label: 'Centrocampisti', emoji: '🎯' },    
+    { key: 'CEN', label: 'Centrocampisti', emoji: '🎯' },
+    { key: 'TRQ', label: 'Trequartisti', emoji: '🎨'},
     { key: 'ATT', label: 'Attaccanti', emoji: '⚽' }
   ];
 

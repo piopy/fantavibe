@@ -92,7 +92,7 @@ const createSearchIndex = (players) => {
  * Calcola il ranking originale per ruolo
  */
 const calculateOriginalRankings = (players) => {
-  const roles = ['POR', 'DIF', 'CEN', 'ATT'];
+  const roles = ['POR', 'DIF', 'CEN', 'TRQ', 'ATT'];
   const rankings = {};
   
   // Calcola ranking per ogni ruolo
@@ -269,7 +269,7 @@ export const validatePlayer = (player) => {
     errors.push('Nome mancante o non valido');
   }
   
-  if (!player.Ruolo || !['ATT', 'DIF', 'CEN', 'POR'].includes(player.Ruolo)) {
+  if (!player.Ruolo || !['ATT', 'DIF', 'CEN', 'TRQ', 'POR'].includes(player.Ruolo)) {
     errors.push('Ruolo mancante o non valido');
   }
   
