@@ -8,13 +8,10 @@ const PlayersTab = ({
   searchIndex = null,
   playerStatus, 
   onPlayerStatusChange,
-  onPlayerAcquire
+  onPlayerAcquire,
+  selectedRole = 'POR',
+  onSelectedRoleChange
 }) => {
-  // Stati principali - SEMPRE dichiarati per rispettare rules of hooks
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRole, setSelectedRole] = useState('POR');
-  const [showDetailedMode, setShowDetailedMode] = useState(false);
-
   // Ruoli disponibili
   const roles = [
     { key: 'POR', label: 'Portieri', emoji: '🥅' },
@@ -23,6 +20,9 @@ const PlayersTab = ({
     { key: 'TRQ', label: 'Trequartisti', emoji: '🎨'},
     { key: 'ATT', label: 'Attaccanti', emoji: '⚽' }
   ];
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDetailedMode, setShowDetailedMode] = useState(false);
 
   const rolesDescription = (roleKey) => {
     const role = roles.find(r => r.key === roleKey);
@@ -69,7 +69,7 @@ const PlayersTab = ({
   };
 
   const handleRoleChange = (roleKey) => {
-    setSelectedRole(roleKey);
+    onSelectedRoleChange(roleKey);
   };
 
   const handleToggleDetailedMode = () => {
