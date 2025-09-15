@@ -273,8 +273,8 @@ const App = () => {
 
         {error && (
           <div style={{
-            padding: '2rem',
-            margin: '2rem auto',
+            padding: '1rem',
+            margin: '1rem auto',
             maxWidth: '600px',
             backgroundColor: '#fef2f2',
             border: '1px solid #fecaca',

@@ -13,7 +13,7 @@ const PlayerCard = ({
   const fantamilioni = playerDetails?.fantamilioni || null;
 
   // Controlla se il giocatore è infortunato
-  const isInjured = player.Infortunato === 'true';
+  const isInjured = player.Infortunato === true;
 
   const handleStatusChange = (newStatus) => {
     if (newStatus === 'acquired' && onAcquire) {
@@ -82,8 +82,8 @@ const PlayerCard = ({
     { key: 'assist', label: 'Assist Previsti', value: player['Assist previsti'] || 'N/A' },
     { key: 'buon_investimento', label: 'Buon Investimento', value: player['Buon investimento'] || 'N/A' },
     { key: 'resistenza', label: 'Resistenza Infortuni', value: player['Resistenza infortuni'] || 'N/A' },
-    { key: 'nuovo_acquisto', label: 'Nuovo Acquisto', value: player['Nuovo acquisto'] === 'true' ? 'SI' : 'NO' || 'N/A' },
-    { key: 'consigliato_prox', label: 'Consigliato Prossima Giornata', value: player['Consigliato prossima giornata'] === 'true'  ? 'SI' : 'NO' || 'N/A' },
+    { key: 'nuovo_acquisto', label: 'Nuovo Acquisto', value: player['Nuovo acquisto'] === true ? 'SI' : 'NO' || 'N/A' },
+    { key: 'consigliato_prox', label: 'Consigliato Prossima Giornata', value: player['Consigliato prossima giornata'] === true  ? 'SI' : 'NO' || 'N/A' },
     // { key: 'partite_giocate', label: 'Partite Giocate', value: player['Partite giocate'] || 'N/A' },
   ];
 
