@@ -164,7 +164,155 @@ export const normalizePlayerData = (fpediaData) => {
  * Filtra giocatori per ruolo
  */
 export const filterPlayersByRole = (players, role) => {
+  if (role === 'ALL') {
+    return players; // Mostra tutti i giocatori
+  }
+  if (role === 'CEN_TRQ') {
+    return players.filter(player => player.Ruolo === 'CEN' || player.Ruolo === 'TRQ');
+  }
   return players.filter(player => player.Ruolo === role);
+};
+
+/**
+ * Opzioni di ordinamento disponibili
+ */
+export const SORT_OPTIONS = [
+  { key: 'convenienza', label: 'Convenienza Potenziale', field: 'convenienza' },
+  { key: 'fantamedia', label: 'Fantamedia', field: 'fantamedia' },
+  { key: 'presenze', label: 'Presenze', field: 'presenze' },
+  { key: 'punteggio', label: 'Punteggio', field: 'punteggio' },
+  { key: 'gol_previsti', label: 'Gol Previsti', field: 'Gol previsti' },
+  { key: 'assist_previsti', label: 'Assist Previsti', field: 'Assist previsti' },
+  { key: 'presenze_previste', label: 'Presenze Previste', field: 'Presenze previste' },
+  { key: 'resistenza', label: 'Resistenza Infortuni', field: 'Resistenza infortuni' },
+  { key: 'quotazione', label: 'Quotazione', field: 'Quotazione' }
+];
+
+/**
+ * Campi numerici filtrabili con range
+ */
+export const NUMERIC_FILTER_FIELDS = [
+  { key: 'convenienza', label: 'Convenienza Potenziale', field: 'convenienza', min: 0, max: 15 },
+  { key: 'fantamedia', label: 'Fantamedia', field: 'fantamedia', min: 0, max: 10 },
+  { key: 'presenze', label: 'Presenze', field: 'presenze', min: 0, max: 38 },
+  { key: 'punteggio', label: 'Punteggio', field: 'punteggio', min: 0, max: 100 },
+  { key: 'gol_previsti', label: 'Gol Previsti', field: 'Gol previsti', min: 0, max: 30 },
+  { key: 'assist_previsti', label: 'Assist Previsti', field: 'Assist previsti', min: 0, max: 20 },
+  { key: 'presenze_previste', label: 'Presenze Previste', field: 'Presenze previste', min: 0, max: 38 },
+  { key: 'resistenza', label: 'Resistenza Infortuni', field: 'Resistenza infortuni', min: 0, max: 10 },
+  { key: 'quotazione', label: 'Quotazione', field: 'Quotazione', min: 1, max: 100 }
+];
+
+/**
+ * Campi booleani filtrabili
+ */
+export const BOOLEAN_FILTER_FIELDS = [
+  { key: 'buon_investimento', label: 'Buon Investimento', field: 'Buon investimento' },
+  { key: 'nuovo_acquisto', label: 'Nuovo Acquisto', field: 'Nuovo acquisto' },
+  { key: 'consigliato_prox', label: 'Consigliato Prossima Giornata', field: 'Consigliato prossima giornata' },
+  { key: 'infortunato', label: 'Infortunato', field: 'Infortunato' }
+];
+
+/**
+ * Ordina giocatori in base al criterio specificato
+ */
+export const sortPlayersByField = (players, sortKey, sortDirection = 'desc') => {
+  // Trova l'opzione di ordinamento corrispondente
+  const sortOption = SORT_OPTIONS.find(option => option.key === sortKey);
+  if (!sortOption) {
+    console.warn(`Sort field ${sortKey} not found, using convenienza as fallback`);
+    return sortPlayersByField(players, 'convenienza', sortDirection);
+  }
+  
+  const sortField = sortOption.field;
+  
+  const sortedPlayers = [...players].sort((a, b) => {
+    let valueA, valueB;
+    
+    // Ottieni i valori da confrontare
+    if (sortKey === 'convenienza' || sortKey === 'fantamedia' || 
+        sortKey === 'presenze' || sortKey === 'punteggio') {
+      // Campi normalizzati 
+      valueA = a[sortKey] || 0;
+      valueB = b[sortKey] || 0;
+    } else {
+      // Campi originali dalla struttura dati
+      valueA = a[sortField] || 0;
+      valueB = b[sortField] || 0;
+    }
+    
+    // Converti in numeri se necessario
+    if (typeof valueA === 'string') valueA = parseFloat(valueA) || 0;
+    if (typeof valueB === 'string') valueB = parseFloat(valueB) || 0;
+    
+    // Applica direzione di ordinamento
+    const result = valueB - valueA; // Default decrescente
+    return sortDirection === 'asc' ? -result : result;
+  });
+  
+  return sortedPlayers;
+};
+
+/**
+ * Applica filtri numerici (range) ai giocatori
+ */
+export const applyNumericFilters = (players, filters) => {
+  return players.filter(player => {
+    return NUMERIC_FILTER_FIELDS.every(field => {
+      const filter = filters[field.key];
+      if (!filter || filter.min === undefined || filter.max === undefined) return true;
+      
+      let value;
+      // Usa i campi normalizzati per convenienza, fantamedia, presenze, punteggio
+      if (field.key === 'convenienza' || field.key === 'fantamedia' || 
+          field.key === 'presenze' || field.key === 'punteggio') {
+        value = player[field.key] || 0;
+      } else {
+        // Per gli altri campi, usa il field name originale
+        value = player[field.field] || 0;
+      }
+      
+      if (typeof value === 'string') value = parseFloat(value) || 0;
+      
+      return value >= filter.min && value <= filter.max;
+    });
+  });
+};
+
+/**
+ * Applica filtri booleani ai giocatori
+ */
+export const applyBooleanFilters = (players, filters) => {
+  return players.filter(player => {
+    return BOOLEAN_FILTER_FIELDS.every(field => {
+      const filter = filters[field.key];
+      if (filter === undefined || filter === null) return true;
+      
+      const playerValue = player[field.field];
+      const normalizedValue = playerValue === 'true' || playerValue === true;
+      
+      return filter === normalizedValue;
+    });
+  });
+};
+
+/**
+ * Applica tutti i filtri ai giocatori
+ */
+export const applyAllFilters = (players, numericFilters, booleanFilters) => {
+  let filteredPlayers = players;
+  
+  // Applica filtri numerici
+  if (numericFilters && Object.keys(numericFilters).length > 0) {
+    filteredPlayers = applyNumericFilters(filteredPlayers, numericFilters);
+  }
+  
+  // Applica filtri booleani
+  if (booleanFilters && Object.keys(booleanFilters).length > 0) {
+    filteredPlayers = applyBooleanFilters(filteredPlayers, booleanFilters);
+  }
+  
+  return filteredPlayers;
 };
 
 /**
@@ -233,10 +381,11 @@ const searchPlayersOptimized = (players, searchIndex, searchTerm) => {
 };
 
 /**
- * Ordina giocatori per convenienza potenziale (decrescente)
+ * Ordina giocatori per convenienza potenziale (decrescente) - LEGACY FUNCTION
+ * Usa sortPlayersByField per nuove implementazioni
  */
 export const sortPlayersByConvenienza = (players) => {
-  return [...players].sort((a, b) => (b.convenienza || 0) - (a.convenienza || 0));
+  return sortPlayersByField(players, 'convenienza', 'desc');
 };
 
 /**

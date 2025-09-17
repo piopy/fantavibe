@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
-import { filterPlayersByRole, searchPlayers, sortPlayersByConvenienza } from '../utils/dataUtils';
+import { filterPlayersByRole, searchPlayers, sortPlayersByField, applyAllFilters, SORT_OPTIONS } from '../utils/dataUtils';
+import FilterPanel from './FilterPanel';
 import PlayerCard from './PlayerCard';
 
 const PlayersTab = ({ 
@@ -15,13 +16,21 @@ const PlayersTab = ({
   // Stati principali - SEMPRE dichiarati per rispettare rules of hooks
   const [searchTerm, setSearchTerm] = useState('');
   const [showDetailedMode, setShowDetailedMode] = useState(false);
+  
+  // Nuovi stati per filtri e ordinamento
+  const [sortField, setSortField] = useState('convenienza');
+  const [sortDirection, setSortDirection] = useState('desc');
+  const [numericFilters, setNumericFilters] = useState({});
+  const [booleanFilters, setBooleanFilters] = useState({});
 
   // Ruoli disponibili
   const roles = [
+    { key: 'ALL', label: 'Tutti i Giocatori', emoji: '👥' },
     { key: 'POR', label: 'Portieri', emoji: '🥅' },
     { key: 'DIF', label: 'Difensori', emoji: '🛡️' },
     { key: 'CEN', label: 'Centrocampisti', emoji: '🎯' },
     { key: 'TRQ', label: 'Trequartisti', emoji: '🎨'},
+    { key: 'CEN_TRQ', label: 'Centro + Trequartisti', emoji: '🎭' },
     { key: 'ATT', label: 'Attaccanti', emoji: '⚽' }
   ];
 
@@ -31,22 +40,28 @@ const PlayersTab = ({
     return role.label;
   }
 
-  // Risultati in base al contesto (ricerca vs classifiche)
+  // Risultati in base al contesto (ricerca vs classifiche) con filtri avanzati
   const displayedPlayers = useMemo(() => {
     // Protezione per dati non ancora caricati
     if (!players || players.length === 0) return [];
     
+    let filteredPlayers;
+    
     if (searchTerm && searchTerm.length >= 2) {
-      // Modalità ricerca: cerca tra tutti i giocatori poi filtra per ruolo e ordina per convenienza
+      // Modalità ricerca: cerca tra tutti i giocatori poi filtra per ruolo
       const searchResults = searchPlayers(players, searchTerm, searchIndex);
-      const filteredByRole = filterPlayersByRole(searchResults, selectedRole);
-      return sortPlayersByConvenienza(filteredByRole);
+      filteredPlayers = filterPlayersByRole(searchResults, selectedRole);
     } else {
-      // Modalità classifiche: mostra tutti i giocatori del ruolo ordinati per convenienza
-      const filtered = filterPlayersByRole(players, selectedRole);
-      return sortPlayersByConvenienza(filtered);
+      // Modalità classifiche: mostra tutti i giocatori del ruolo
+      filteredPlayers = filterPlayersByRole(players, selectedRole);
     }
-  }, [players, searchTerm, selectedRole, searchIndex]);
+    
+    // Applica filtri avanzati
+    filteredPlayers = applyAllFilters(filteredPlayers, numericFilters, booleanFilters);
+    
+    // Ordina per il campo selezionato
+    return sortPlayersByField(filteredPlayers, sortField, sortDirection);
+  }, [players, searchTerm, selectedRole, searchIndex, numericFilters, booleanFilters, sortField, sortDirection]);
 
   // Statistiche per il ruolo selezionato
   const roleStats = useMemo(() => {
@@ -81,6 +96,26 @@ const PlayersTab = ({
 
   const handleClearSearch = () => {
     setSearchTerm('');
+  };
+
+  // Nuovi handlers per filtri e ordinamento
+  const handleSortChange = (field) => {
+    if (field === sortField) {
+      // Se è lo stesso campo, inverti la direzione
+      setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc');
+    } else {
+      // Se è un campo diverso, imposta il nuovo campo con direzione decrescente
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const handleNumericFiltersChange = (filters) => {
+    setNumericFilters(filters);
+  };
+
+  const handleBooleanFiltersChange = (filters) => {
+    setBooleanFilters(filters);
   };
 
   // Determina se siamo in modalità ricerca
@@ -407,10 +442,77 @@ const PlayersTab = ({
               }}>
                 🔍 "{searchTerm}"
               </div>
-            )}
-          </div>
+        )}
+        
+        {/* Controlli di Ordinamento */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '1rem',
+          marginTop: '1rem',
+          padding: '1rem',
+          backgroundColor: '#f8fafc',
+          borderRadius: '8px',
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ 
+            fontSize: '0.9rem', 
+            fontWeight: '600', 
+            color: '#374151',
+            minWidth: 'fit-content'
+          }}>
+            📊 Ordina per:
+          </span>
+          <select
+            value={sortField}
+            onChange={(e) => setSortField(e.target.value)}
+            style={{
+              padding: '0.5rem',
+              borderRadius: '6px',
+              border: '1px solid #d1d5db',
+              fontSize: '0.9rem',
+              backgroundColor: 'white',
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            {SORT_OPTIONS.map(option => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc')}
+            style={{
+              padding: '0.5rem 0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #d1d5db',
+              backgroundColor: 'white',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              outline: 'none'
+            }}
+          >
+            {sortDirection === 'desc' ? '↓' : '↑'}
+            {sortDirection === 'desc' ? 'Decrescente' : 'Crescente'}
+          </button>
+        </div>
+      </div>
 
-          {/* Controlli */}
+      {/* Filtri Avanzati */}
+      <FilterPanel
+        onNumericFiltersChange={handleNumericFiltersChange}
+        onBooleanFiltersChange={handleBooleanFiltersChange}
+        numericFilters={numericFilters}
+        booleanFilters={booleanFilters}
+        totalPlayers={players ? filterPlayersByRole(players, selectedRole).length : 0}
+        filteredPlayers={displayedPlayers.length}
+      />          {/* Controlli */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             {/* Toggle dettagli */}
             <button
