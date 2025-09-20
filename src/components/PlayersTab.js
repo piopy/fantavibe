@@ -22,6 +22,8 @@ const PlayersTab = ({
   const [sortDirection, setSortDirection] = useState('desc');
   const [numericFilters, setNumericFilters] = useState({});
   const [booleanFilters, setBooleanFilters] = useState({});
+  const [categoricalFilters, setCategoricalFilters] = useState({});
+  const [skillsFilters, setSkillsFilters] = useState({});
 
   // Ruoli disponibili
   const roles = [
@@ -57,11 +59,11 @@ const PlayersTab = ({
     }
     
     // Applica filtri avanzati
-    filteredPlayers = applyAllFilters(filteredPlayers, numericFilters, booleanFilters);
+    filteredPlayers = applyAllFilters(filteredPlayers, numericFilters, booleanFilters, skillsFilters, categoricalFilters);
     
     // Ordina per il campo selezionato
     return sortPlayersByField(filteredPlayers, sortField, sortDirection);
-  }, [players, searchTerm, selectedRole, searchIndex, numericFilters, booleanFilters, sortField, sortDirection]);
+  }, [players, searchTerm, selectedRole, searchIndex, numericFilters, booleanFilters, categoricalFilters, skillsFilters, sortField, sortDirection]);
 
   // Statistiche per il ruolo selezionato
   const roleStats = useMemo(() => {
@@ -116,6 +118,14 @@ const PlayersTab = ({
 
   const handleBooleanFiltersChange = (filters) => {
     setBooleanFilters(filters);
+  };
+
+  const handleCategoricalFiltersChange = (filters) => {
+    setCategoricalFilters(filters);
+  };
+
+  const handleSkillsFiltersChange = (filters) => {
+    setSkillsFilters(filters);
   };
 
   // Determina se siamo in modalità ricerca
@@ -508,8 +518,12 @@ const PlayersTab = ({
       <FilterPanel
         onNumericFiltersChange={handleNumericFiltersChange}
         onBooleanFiltersChange={handleBooleanFiltersChange}
+        onCategoricalFiltersChange={handleCategoricalFiltersChange}
+        onSkillsFiltersChange={handleSkillsFiltersChange}
         numericFilters={numericFilters}
         booleanFilters={booleanFilters}
+        categoricalFilters={categoricalFilters}
+        skillsFilters={skillsFilters}
         totalPlayers={players ? filterPlayersByRole(players, selectedRole).length : 0}
         filteredPlayers={displayedPlayers.length}
       />          {/* Controlli */}

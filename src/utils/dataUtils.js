@@ -206,7 +206,7 @@ export const getGoalsLabel = (role) => {
  */
 export const SKILLS_MAPPING = {
   'Buona Media': { emoji: '👍', description: 'Buona Media: Giocatore con buona fantamedia' },
-  'Piazzati': { emoji: '🎯', description: 'Piazzati: Specialista nei calci piazzati' },
+  'Piazzati': { emoji: '🦅', description: 'Piazzati: Specialista nei calci piazzati' },
   'Giovane talento': { emoji: '🌱', description: 'Giovane talento: Talento emergente con margini di crescita' },
   'Panchinaro': { emoji: '🪑', description: 'Panchinaro: Spesso in panchina, minuti limitati' },
   'Titolare': { emoji: '💎', description: 'Titolare: Giocatore titolare fisso nella sua squadra' },
@@ -279,7 +279,7 @@ export const SORT_OPTIONS = [
  * Campi numerici filtrabili con range
  */
 export const NUMERIC_FILTER_FIELDS = [
-  { key: 'convenienza', label: 'Convenienza Potenziale', field: 'convenienza', min: 0, max: 15 },
+  { key: 'convenienza', label: 'Convenienza Potenziale', field: 'convenienza', min: 0, max: 200 },
   { key: 'fantamedia', label: 'Fantamedia', field: 'fantamedia', min: 0, max: 10 },
   { key: 'presenze', label: 'Presenze', field: 'presenze', min: 0, max: 38 },
   { key: 'punteggio', label: 'Punteggio', field: 'punteggio', min: 0, max: 100 },
@@ -294,10 +294,41 @@ export const NUMERIC_FILTER_FIELDS = [
  * Campi booleani filtrabili
  */
 export const BOOLEAN_FILTER_FIELDS = [
-  { key: 'buon_investimento', label: 'Buon Investimento', field: 'Buon investimento' },
   { key: 'nuovo_acquisto', label: 'Nuovo Acquisto', field: 'Nuovo acquisto' },
   { key: 'consigliato_prox', label: 'Consigliato Prossima Giornata', field: 'Consigliato prossima giornata' },
   { key: 'infortunato', label: 'Infortunato', field: 'Infortunato' }
+];
+
+/**
+ * Campi categorici con valori numerici
+ */
+export const CATEGORICAL_FILTER_FIELDS = [
+  { 
+    key: 'buon_investimento', 
+    label: 'Buon Investimento', 
+    field: 'Buon investimento',
+    categories: [
+      { key: 'no', label: 'No', values: [20, 40] },
+      { key: 'si', label: 'Sì', values: [60, 80, 100] }
+    ]
+  }
+];
+
+/**
+ * Skills filtrabili disponibili
+ */
+export const SKILLS_FILTER_OPTIONS = [
+  { key: 'buona_media', label: 'Buona Media', skillName: 'Buona Media' },
+  { key: 'piazzati', label: 'Piazzati', skillName: 'Piazzati' },
+  { key: 'giovane_talento', label: 'Giovane Talento', skillName: 'Giovane talento' },
+  { key: 'panchinaro', label: 'Panchinaro', skillName: 'Panchinaro' },
+  { key: 'titolare', label: 'Titolare', skillName: 'Titolare' },
+  { key: 'rigorista', label: 'Rigorista', skillName: 'Rigorista' },
+  { key: 'outsider', label: 'Outsider', skillName: 'Outsider' },
+  { key: 'assistman', label: 'Assistman', skillName: 'Assistman' },
+  { key: 'falloso', label: 'Falloso', skillName: 'Falloso' },
+  { key: 'fuoriclasse', label: 'Fuoriclasse', skillName: 'Fuoriclasse' },
+  { key: 'goleador', label: 'Goleador', skillName: 'Goleador' }
 ];
 
 /**
@@ -401,9 +432,52 @@ export const applyBooleanFilters = (players, filters) => {
 };
 
 /**
+ * Applica filtri categorici ai giocatori
+ */
+export const applyCategoricalFilters = (players, filters) => {
+  return players.filter(player => {
+    return CATEGORICAL_FILTER_FIELDS.every(field => {
+      const filter = filters[field.key];
+      if (filter === undefined || filter === null) return true;
+      
+      const playerValue = parseFloat(player[field.field]) || 0;
+      
+      // Trova la categoria corrispondente al filtro selezionato
+      const selectedCategory = field.categories.find(cat => cat.key === filter);
+      if (!selectedCategory) return true;
+      
+      // Controlla se il valore del giocatore è incluso nei valori della categoria
+      return selectedCategory.values.includes(playerValue);
+    });
+  });
+};
+
+/**
+ * Applica filtri per skills ai giocatori
+ */
+export const applySkillsFilters = (players, skillsFilters) => {
+  return players.filter(player => {
+    // Se non ci sono filtri skills attivi, includi tutti i giocatori
+    const activeSkillFilters = Object.entries(skillsFilters || {}).filter(([_, isActive]) => isActive);
+    if (activeSkillFilters.length === 0) return true;
+    
+    // Ottieni le skills del giocatore
+    const playerSkills = getPlayerSkills(player);
+    
+    // Il giocatore deve avere TUTTE le skills filtrate (AND logic)
+    return activeSkillFilters.every(([skillKey, _]) => {
+      const skillOption = SKILLS_FILTER_OPTIONS.find(option => option.key === skillKey);
+      if (!skillOption) return false;
+      
+      return playerSkills.includes(skillOption.skillName);
+    });
+  });
+};
+
+/**
  * Applica tutti i filtri ai giocatori
  */
-export const applyAllFilters = (players, numericFilters, booleanFilters) => {
+export const applyAllFilters = (players, numericFilters, booleanFilters, skillsFilters, categoricalFilters) => {
   let filteredPlayers = players;
   
   // Applica filtri numerici
@@ -414,6 +488,16 @@ export const applyAllFilters = (players, numericFilters, booleanFilters) => {
   // Applica filtri booleani
   if (booleanFilters && Object.keys(booleanFilters).length > 0) {
     filteredPlayers = applyBooleanFilters(filteredPlayers, booleanFilters);
+  }
+  
+  // Applica filtri categorici
+  if (categoricalFilters && Object.keys(categoricalFilters).length > 0) {
+    filteredPlayers = applyCategoricalFilters(filteredPlayers, categoricalFilters);
+  }
+  
+  // Applica filtri skills
+  if (skillsFilters && Object.keys(skillsFilters).length > 0) {
+    filteredPlayers = applySkillsFilters(filteredPlayers, skillsFilters);
   }
   
   return filteredPlayers;

@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
-import { NUMERIC_FILTER_FIELDS, BOOLEAN_FILTER_FIELDS } from '../utils/dataUtils';
+import { NUMERIC_FILTER_FIELDS, BOOLEAN_FILTER_FIELDS, CATEGORICAL_FILTER_FIELDS, SKILLS_FILTER_OPTIONS } from '../utils/dataUtils';
 
 const FilterPanel = ({ 
   onNumericFiltersChange, 
-  onBooleanFiltersChange, 
+  onBooleanFiltersChange,
+  onCategoricalFiltersChange,
+  onSkillsFiltersChange,
   numericFilters = {}, 
   booleanFilters = {},
+  categoricalFilters = {},
+  skillsFilters = {},
   totalPlayers = 0,
   filteredPlayers = 0
 }) => {
@@ -29,6 +33,24 @@ const FilterPanel = ({
     const initial = {};
     BOOLEAN_FILTER_FIELDS.forEach(field => {
       initial[field.key] = booleanFilters[field.key];
+    });
+    return initial;
+  });
+
+  // Stati locali per i filtri categorici
+  const [localCategoricalFilters, setLocalCategoricalFilters] = useState(() => {
+    const initial = {};
+    CATEGORICAL_FILTER_FIELDS.forEach(field => {
+      initial[field.key] = categoricalFilters[field.key];
+    });
+    return initial;
+  });
+
+  // Stati locali per i filtri skills
+  const [localSkillsFilters, setLocalSkillsFilters] = useState(() => {
+    const initial = {};
+    SKILLS_FILTER_OPTIONS.forEach(skill => {
+      initial[skill.key] = skillsFilters[skill.key] || false;
     });
     return initial;
   });
@@ -58,6 +80,24 @@ const FilterPanel = ({
     onBooleanFiltersChange(newFilters);
   };
 
+  const handleCategoricalFilterChange = (fieldKey, value) => {
+    const newFilters = {
+      ...localCategoricalFilters,
+      [fieldKey]: value
+    };
+    setLocalCategoricalFilters(newFilters);
+    onCategoricalFiltersChange(newFilters);
+  };
+
+  const handleSkillsFilterChange = (skillKey, isActive) => {
+    const newFilters = {
+      ...localSkillsFilters,
+      [skillKey]: isActive
+    };
+    setLocalSkillsFilters(newFilters);
+    onSkillsFiltersChange(newFilters);
+  };
+
   const handleResetFilters = () => {
     // Reset filtri numerici ai valori di default
     const resetNumeric = {};
@@ -71,10 +111,26 @@ const FilterPanel = ({
       resetBoolean[field.key] = undefined;
     });
 
+    // Reset filtri categorici
+    const resetCategorical = {};
+    CATEGORICAL_FILTER_FIELDS.forEach(field => {
+      resetCategorical[field.key] = undefined;
+    });
+
+    // Reset filtri skills
+    const resetSkills = {};
+    SKILLS_FILTER_OPTIONS.forEach(skill => {
+      resetSkills[skill.key] = false;
+    });
+
     setLocalNumericFilters(resetNumeric);
     setLocalBooleanFilters(resetBoolean);
+    setLocalCategoricalFilters(resetCategorical);
+    setLocalSkillsFilters(resetSkills);
     onNumericFiltersChange(resetNumeric);
     onBooleanFiltersChange(resetBoolean);
+    onCategoricalFiltersChange(resetCategorical);
+    onSkillsFiltersChange(resetSkills);
   };
 
   // Controlla se ci sono filtri attivi
@@ -90,7 +146,17 @@ const FilterPanel = ({
       return localBooleanFilters[field.key] !== undefined;
     });
     
-    return hasNumericFilters || hasBooleanFilters;
+    // Controlla filtri categorici
+    const hasCategoricalFilters = CATEGORICAL_FILTER_FIELDS.some(field => {
+      return localCategoricalFilters[field.key] !== undefined;
+    });
+    
+    // Controlla filtri skills
+    const hasSkillsFilters = SKILLS_FILTER_OPTIONS.some(skill => {
+      return localSkillsFilters[skill.key] === true;
+    });
+    
+    return hasNumericFilters || hasBooleanFilters || hasCategoricalFilters || hasSkillsFilters;
   };
 
   // Stili
@@ -123,8 +189,8 @@ const FilterPanel = ({
 
   const contentStyle = {
     padding: isExpanded ? '1.5rem' : '0',
-    maxHeight: isExpanded ? '1000px' : '0',
-    overflow: 'hidden',
+    maxHeight: isExpanded ? '60vh' : '0', // Limita l'altezza a 60% del viewport
+    overflow: isExpanded ? 'auto' : 'hidden', // Permette scroll quando espanso
     transition: 'all 0.3s ease'
   };
 
@@ -342,6 +408,80 @@ const FilterPanel = ({
               </div>
             );
           })}
+        </div>
+
+        {/* Filtri Categorici */}
+        <div style={sectionStyle}>
+          <div style={sectionTitleStyle}>Filtri Categorici Avanzati</div>
+          {CATEGORICAL_FILTER_FIELDS.map(field => {
+            const filterValue = localCategoricalFilters[field.key];
+            return (
+              <div key={field.key} style={checkboxRowStyle}>
+                <span style={labelStyle}>{field.label}</span>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem' }}>
+                    <input
+                      type="radio"
+                      name={field.key}
+                      checked={filterValue === undefined}
+                      onChange={() => handleCategoricalFilterChange(field.key, undefined)}
+                    />
+                    Tutti
+                  </label>
+                  {field.categories.map(category => (
+                    <label key={category.key} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem' }}>
+                      <input
+                        type="radio"
+                        name={field.key}
+                        checked={filterValue === category.key}
+                        onChange={() => handleCategoricalFilterChange(field.key, category.key)}
+                      />
+                      {category.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Filtri Skills */}
+        <div style={sectionStyle}>
+          <div style={sectionTitleStyle}>Filtri per Skills</div>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '0.75rem' 
+          }}>
+            {SKILLS_FILTER_OPTIONS.map(skill => {
+              const isActive = localSkillsFilters[skill.key];
+              return (
+                <label 
+                  key={skill.key} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem', 
+                    fontSize: '0.85rem',
+                    padding: '0.5rem',
+                    backgroundColor: isActive ? '#dbeafe' : '#f9fafb',
+                    borderRadius: '6px',
+                    border: isActive ? '1px solid #3b82f6' : '1px solid #e5e7eb',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={(e) => handleSkillsFilterChange(skill.key, e.target.checked)}
+                    style={{ marginRight: '0.25rem' }}
+                  />
+                  {skill.label}
+                </label>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
