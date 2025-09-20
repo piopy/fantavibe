@@ -266,14 +266,13 @@ export const getPlayerSkills = (player) => {
 export const SORT_OPTIONS = [
   { key: 'convenienza', label: 'Convenienza Potenziale', field: 'convenienza' },
   { key: 'fantamedia', label: 'Fantamedia 2024-2025', field: 'fantamedia' },
-  { key: 'fantamedia_2023', label: 'Fantamedia 2023-2024', field: 'Fantamedia anno 2023-2024' },
   { key: 'presenze', label: 'Presenze', field: 'presenze' },
   { key: 'punteggio', label: 'Punteggio', field: 'punteggio' },
   { key: 'gol_previsti', label: 'Gol Previsti', field: 'Gol previsti', useExpectedGoals: true },
   { key: 'assist_previsti', label: 'Assist Previsti', field: 'Assist previsti' },
   { key: 'presenze_previste', label: 'Presenze Previste', field: 'Presenze previste' },
   { key: 'resistenza', label: 'Resistenza Infortuni', field: 'Resistenza infortuni' },
-  { key: 'fm_tot_gare', label: 'FM su Tot Gare', field: 'FM su tot gare 2024-2025' }
+  { key: 'fm_tot_gare', label: 'Fantamedia 24-25/38 partite', field: 'FM su tot gare 2024-2025' }
 ];
 
 /**
