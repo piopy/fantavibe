@@ -28,7 +28,7 @@ const App = () => {
   const [playerToAcquire, setPlayerToAcquire] = useState(null);
 
   // Stato per preservare la selezione del ruolo tra i cambi di tab
-  const [selectedRole, setSelectedRole] = useState('POR');
+  const [selectedRole, setSelectedRole] = useState('ALL');
 
   // Carica status giocatori all'avvio
   useEffect(() => {

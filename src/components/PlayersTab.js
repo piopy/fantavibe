@@ -10,7 +10,7 @@ const PlayersTab = ({
   playerStatus, 
   onPlayerStatusChange,
   onPlayerAcquire,
-  selectedRole = 'POR',
+  selectedRole = 'ALL',
   onRoleChange
 }) => {
   // Stati principali - SEMPRE dichiarati per rispettare rules of hooks
@@ -22,6 +22,8 @@ const PlayersTab = ({
   const [sortDirection, setSortDirection] = useState('desc');
   const [numericFilters, setNumericFilters] = useState({});
   const [booleanFilters, setBooleanFilters] = useState({});
+  const [categoricalFilters, setCategoricalFilters] = useState({});
+  const [skillsFilters, setSkillsFilters] = useState({});
 
   // Ruoli disponibili
   const roles = [
@@ -57,11 +59,11 @@ const PlayersTab = ({
     }
     
     // Applica filtri avanzati
-    filteredPlayers = applyAllFilters(filteredPlayers, numericFilters, booleanFilters);
+    filteredPlayers = applyAllFilters(filteredPlayers, numericFilters, booleanFilters, skillsFilters, categoricalFilters);
     
     // Ordina per il campo selezionato
     return sortPlayersByField(filteredPlayers, sortField, sortDirection);
-  }, [players, searchTerm, selectedRole, searchIndex, numericFilters, booleanFilters, sortField, sortDirection]);
+  }, [players, searchTerm, selectedRole, searchIndex, numericFilters, booleanFilters, categoricalFilters, skillsFilters, sortField, sortDirection]);
 
   // Statistiche per il ruolo selezionato
   const roleStats = useMemo(() => {
@@ -116,6 +118,14 @@ const PlayersTab = ({
 
   const handleBooleanFiltersChange = (filters) => {
     setBooleanFilters(filters);
+  };
+
+  const handleCategoricalFiltersChange = (filters) => {
+    setCategoricalFilters(filters);
+  };
+
+  const handleSkillsFiltersChange = (filters) => {
+    setSkillsFilters(filters);
   };
 
   // Determina se siamo in modalità ricerca
@@ -442,7 +452,8 @@ const PlayersTab = ({
               }}>
                 🔍 "{searchTerm}"
               </div>
-        )}
+            )}
+          </div>
         
         {/* Controlli di Ordinamento */}
         <div style={{
@@ -503,54 +514,59 @@ const PlayersTab = ({
           </button>
         </div>
       </div>
+      )}
 
-      {/* Filtri Avanzati */}
+      {/* Filtri Avanzati - Ora occupano tutta la larghezza */}
       <FilterPanel
         onNumericFiltersChange={handleNumericFiltersChange}
         onBooleanFiltersChange={handleBooleanFiltersChange}
+        onCategoricalFiltersChange={handleCategoricalFiltersChange}
+        onSkillsFiltersChange={handleSkillsFiltersChange}
         numericFilters={numericFilters}
         booleanFilters={booleanFilters}
+        categoricalFilters={categoricalFilters}
+        skillsFilters={skillsFilters}
         totalPlayers={players ? filterPlayersByRole(players, selectedRole).length : 0}
         filteredPlayers={displayedPlayers.length}
-      />          {/* Controlli */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {/* Toggle dettagli */}
-            <button
-              onClick={handleToggleDetailedMode}
-              style={toggleButtonStyle}
-              onMouseEnter={(e) => {
-                if (!showDetailedMode) {
-                  e.target.style.backgroundColor = '#e5e7eb';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!showDetailedMode) {
-                  e.target.style.backgroundColor = '#f3f4f6';
-                }
-              }}
-            >
-              {showDetailedMode ? '📊' : '📈'}
-              {showDetailedMode ? 'Nascondi Dettagli' : 'Mostra Dettagli'}
-            </button>
+      />
 
-            {/* Pulsante pulisci ricerca */}
-            {searchTerm && (
-              <button
-                onClick={handleClearSearch}
-                style={clearButtonStyle}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#e5e7eb';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
-                }}
-              >
-                Pulisci ricerca
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Controlli sotto i filtri */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        {/* Toggle dettagli */}
+        <button
+          onClick={handleToggleDetailedMode}
+          style={toggleButtonStyle}
+          onMouseEnter={(e) => {
+            if (!showDetailedMode) {
+              e.target.style.backgroundColor = '#e5e7eb';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!showDetailedMode) {
+              e.target.style.backgroundColor = '#f3f4f6';
+            }
+          }}
+        >
+          {showDetailedMode ? '📊' : '📈'}
+          {showDetailedMode ? 'Nascondi Dettagli' : 'Mostra Dettagli'}
+        </button>
+
+        {/* Pulsante pulisci ricerca */}
+        {searchTerm && (
+          <button
+            onClick={handleClearSearch}
+            style={clearButtonStyle}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#e5e7eb';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = '#f3f4f6';
+            }}
+          >
+            Pulisci ricerca
+          </button>
+        )}
+      </div>
 
       {/* Messaggio ricerca troppo corta */}
       {searchTerm && searchTerm.length < 2 && (
@@ -652,7 +668,6 @@ const PlayersTab = ({
         </div>
       )}
     </div>
-  );
-};
+  )};
 
 export default PlayersTab;
