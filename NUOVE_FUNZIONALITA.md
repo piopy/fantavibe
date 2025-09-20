@@ -128,5 +128,5 @@ Le nuove funzionalità trasformano FantaVibe da semplice visualizzatore a **pote
 
 # TODO!
 
-- [ ] Portieri devono avere exp.Goals negativi
+- [x] Portieri devono avere exp.Goals negativi -- i dati fanno comunque schifo dei goals dei portieri.
 - [ ] Chi schierare in rosa per la prossima giornata (per ora basarsi sulla colonna "Consigliato Prossima Giornata", infortuni esclusi, e la convenienza, poi andare su fantacalcio-py a trovare dati aggiornati per giornata)
