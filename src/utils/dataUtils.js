@@ -174,6 +174,43 @@ export const filterPlayersByRole = (players, role) => {
 };
 
 /**
+ * Calcola i gol previsti con logica specifica per i portieri
+ * I portieri hanno i gol come valori negativi (gol subiti)
+ */
+export const getExpectedGoals = (player) => {
+  const golPrevisti = player['Gol previsti'];
+  
+  // Debug per portieri
+  if (player.Ruolo === 'POR') {
+    console.log(`Debug Portiere ${player.Nome}:`, {
+      'Gol previsti': golPrevisti,
+      'Tipo': typeof golPrevisti,
+      'Tutti i campi gol': Object.keys(player).filter(k => k.toLowerCase().includes('gol'))
+    });
+  }
+  
+  // Se non c'è il dato, restituisce null per mostrare 'N/A'
+  if (golPrevisti === undefined || golPrevisti === null || golPrevisti === '' || isNaN(parseFloat(golPrevisti))) {
+    return null;
+  }
+  
+  const numericValue = parseFloat(golPrevisti);
+  
+  // Per i portieri, convertiamo i gol in valori negativi
+  if (player.Ruolo === 'POR') {
+    return -Math.abs(numericValue);
+  }
+  return numericValue;
+};
+
+/**
+ * Ottiene la label appropriata per i gol previsti in base al ruolo
+ */
+export const getGoalsLabel = (role) => {
+  return role === 'POR' ? 'Gol Subiti Previsti' : 'Gol Previsti';
+};
+
+/**
  * Opzioni di ordinamento disponibili
  */
 export const SORT_OPTIONS = [
@@ -181,7 +218,7 @@ export const SORT_OPTIONS = [
   { key: 'fantamedia', label: 'Fantamedia', field: 'fantamedia' },
   { key: 'presenze', label: 'Presenze', field: 'presenze' },
   { key: 'punteggio', label: 'Punteggio', field: 'punteggio' },
-  { key: 'gol_previsti', label: 'Gol Previsti', field: 'Gol previsti' },
+  { key: 'gol_previsti', label: 'Gol Previsti', field: 'Gol previsti', useExpectedGoals: true },
   { key: 'assist_previsti', label: 'Assist Previsti', field: 'Assist previsti' },
   { key: 'presenze_previste', label: 'Presenze Previste', field: 'Presenze previste' },
   { key: 'resistenza', label: 'Resistenza Infortuni', field: 'Resistenza infortuni' },
@@ -196,7 +233,7 @@ export const NUMERIC_FILTER_FIELDS = [
   { key: 'fantamedia', label: 'Fantamedia', field: 'fantamedia', min: 0, max: 10 },
   { key: 'presenze', label: 'Presenze', field: 'presenze', min: 0, max: 38 },
   { key: 'punteggio', label: 'Punteggio', field: 'punteggio', min: 0, max: 100 },
-  { key: 'gol_previsti', label: 'Gol Previsti', field: 'Gol previsti', min: 0, max: 30 },
+  { key: 'gol_previsti', label: 'Gol Previsti', field: 'Gol previsti', min: -30, max: 30, useExpectedGoals: true },
   { key: 'assist_previsti', label: 'Assist Previsti', field: 'Assist previsti', min: 0, max: 20 },
   { key: 'presenze_previste', label: 'Presenze Previste', field: 'Presenze previste', min: 0, max: 38 },
   { key: 'resistenza', label: 'Resistenza Infortuni', field: 'Resistenza infortuni', min: 0, max: 10 },
@@ -229,9 +266,16 @@ export const sortPlayersByField = (players, sortKey, sortDirection = 'desc') => 
   const sortedPlayers = [...players].sort((a, b) => {
     let valueA, valueB;
     
-    // Ottieni i valori da confrontare
-    if (sortKey === 'convenienza' || sortKey === 'fantamedia' || 
-        sortKey === 'presenze' || sortKey === 'punteggio') {
+    // Gestione speciale per i gol previsti
+    if (sortOption.useExpectedGoals) {
+      valueA = getExpectedGoals(a);
+      valueB = getExpectedGoals(b);
+      // Se uno dei valori è null, mettilo alla fine
+      if (valueA === null && valueB === null) return 0;
+      if (valueA === null) return 1;
+      if (valueB === null) return -1;
+    } else if (sortKey === 'convenienza' || sortKey === 'fantamedia' || 
+               sortKey === 'presenze' || sortKey === 'punteggio') {
       // Campi normalizzati 
       valueA = a[sortKey] || 0;
       valueB = b[sortKey] || 0;
@@ -241,9 +285,11 @@ export const sortPlayersByField = (players, sortKey, sortDirection = 'desc') => 
       valueB = b[sortField] || 0;
     }
     
-    // Converti in numeri se necessario
-    if (typeof valueA === 'string') valueA = parseFloat(valueA) || 0;
-    if (typeof valueB === 'string') valueB = parseFloat(valueB) || 0;
+    // Converti in numeri se necessario (solo se non stiamo già gestendo i gol previsti)
+    if (!sortOption.useExpectedGoals) {
+      if (typeof valueA === 'string') valueA = parseFloat(valueA) || 0;
+      if (typeof valueB === 'string') valueB = parseFloat(valueB) || 0;
+    }
     
     // Applica direzione di ordinamento
     const result = valueB - valueA; // Default decrescente
@@ -263,16 +309,24 @@ export const applyNumericFilters = (players, filters) => {
       if (!filter || filter.min === undefined || filter.max === undefined) return true;
       
       let value;
-      // Usa i campi normalizzati per convenienza, fantamedia, presenze, punteggio
-      if (field.key === 'convenienza' || field.key === 'fantamedia' || 
-          field.key === 'presenze' || field.key === 'punteggio') {
+      // Gestione speciale per i gol previsti
+      if (field.useExpectedGoals) {
+        value = getExpectedGoals(player);
+        // Se il valore è null (dati mancanti), includi il giocatore nel risultato
+        if (value === null) return true;
+      } else if (field.key === 'convenienza' || field.key === 'fantamedia' || 
+                 field.key === 'presenze' || field.key === 'punteggio') {
+        // Usa i campi normalizzati per convenienza, fantamedia, presenze, punteggio
         value = player[field.key] || 0;
       } else {
         // Per gli altri campi, usa il field name originale
         value = player[field.field] || 0;
       }
       
-      if (typeof value === 'string') value = parseFloat(value) || 0;
+      // Converti in numeri se necessario (solo se non stiamo già gestendo i gol previsti)
+      if (!field.useExpectedGoals && typeof value === 'string') {
+        value = parseFloat(value) || 0;
+      }
       
       return value >= filter.min && value <= filter.max;
     });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { getPlayerDetails } from '../utils/storage';
+import { getExpectedGoals, getGoalsLabel } from '../utils/dataUtils';
 
 const PlayerCard = ({ 
   player, 
@@ -72,13 +73,16 @@ const PlayerCard = ({
   ];
 
   // Statistiche complete (visibili quando showAllStats è true)
+  const expectedGoals = getExpectedGoals(player);
+  const goalsLabel = getGoalsLabel(player.Ruolo);
+  
   const allStats = [
     ...baseStats,
     { key: 'convenienza', label: 'Convenienza', value: player['Convenienza'].toFixed(2) || 'N/A' },
     { key: 'punteggio', label: 'Punteggio', value: player.punteggio || player.Punteggio || 'N/A' },
     { key: 'presenze_previste', label: 'Presenze Previste', value: player['Presenze previste'] || 'N/A' },
     { key: 'presenze', label: 'Presenze AP', value: player.presenze || player['Presenze campionato corrente'] || 'N/A' },
-    { key: 'gol', label: 'Gol Previsti', value: player['Gol previsti'] || 'N/A' },
+    { key: 'gol', label: goalsLabel, value: expectedGoals !== null ? expectedGoals : 'N/A' },
     { key: 'assist', label: 'Assist Previsti', value: player['Assist previsti'] || 'N/A' },
     { key: 'buon_investimento', label: 'Buon Investimento', value: player['Buon investimento'] || 'N/A' },
     { key: 'resistenza', label: 'Resistenza Infortuni', value: player['Resistenza infortuni'] || 'N/A' },
