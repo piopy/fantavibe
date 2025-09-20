@@ -3,6 +3,8 @@ import {
   filterPlayersByRole, 
   sortPlayersByField, 
   applyAllFilters,
+  getExpectedGoals,
+  getGoalsLabel,
   SORT_OPTIONS,
   NUMERIC_FILTER_FIELDS,
   BOOLEAN_FILTER_FIELDS
@@ -23,7 +25,8 @@ const testPlayers = [
     'Buon investimento': 'true',
     'Nuovo acquisto': 'false',
     'Consigliato prossima giornata': 'true',
-    Infortunato: 'false'
+    Infortunato: 'false',
+    Skills: ['Titolare', 'Assist-man', 'Nazionale']
   },
   {
     id: 'player2',
@@ -38,7 +41,8 @@ const testPlayers = [
     'Buon investimento': 'false',
     'Nuovo acquisto': 'true',
     'Consigliato prossima giornata': 'false',
-    Infortunato: 'false'
+    Infortunato: 'false',
+    Skills: ['Giovane', 'Outsider', 'Forma_Crescente']
   },
   {
     id: 'player3',
@@ -53,7 +57,24 @@ const testPlayers = [
     'Buon investimento': 'true',
     'Nuovo acquisto': 'false',
     'Consigliato prossima giornata': 'true',
-    Infortunato: 'true'
+    Infortunato: 'true',
+    Skills: ['Fuoriclasse', 'Bomber', 'Rigorista']
+  },
+  {
+    id: 'player4',
+    Nome: 'Test Goalkeeper',
+    Ruolo: 'POR',
+    convenienza: 6.8,
+    fantamedia: 6.5,
+    presenze: 30,
+    punteggio: 75,
+    'Gol previsti': 15, // Questo sarà convertito in -15 per i portieri
+    'Assist previsti': 0,
+    'Buon investimento': 'true',
+    'Nuovo acquisto': 'false',
+    'Consigliato prossima giornata': 'false',
+    Infortunato: 'false',
+    Skills: ['Titolare', 'Veterano', 'Capitano']
   }
 ];
 

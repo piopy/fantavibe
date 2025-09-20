@@ -180,15 +180,6 @@ export const filterPlayersByRole = (players, role) => {
 export const getExpectedGoals = (player) => {
   const golPrevisti = player['Gol previsti'];
   
-  // Debug per portieri
-  if (player.Ruolo === 'POR') {
-    console.log(`Debug Portiere ${player.Nome}:`, {
-      'Gol previsti': golPrevisti,
-      'Tipo': typeof golPrevisti,
-      'Tutti i campi gol': Object.keys(player).filter(k => k.toLowerCase().includes('gol'))
-    });
-  }
-  
   // Se non c'è il dato, restituisce null per mostrare 'N/A'
   if (golPrevisti === undefined || golPrevisti === null || golPrevisti === '' || isNaN(parseFloat(golPrevisti))) {
     return null;
@@ -208,6 +199,72 @@ export const getExpectedGoals = (player) => {
  */
 export const getGoalsLabel = (role) => {
   return role === 'POR' ? 'Gol Subiti Previsti' : 'Gol Previsti';
+};
+
+/**
+ * Mappatura delle skills con emoji e descrizioni
+ */
+export const SKILLS_MAPPING = {
+  'Buona Media': { emoji: '👍', description: 'Buona Media: Giocatore con buona fantamedia' },
+  'Piazzati': { emoji: '🎯', description: 'Piazzati: Specialista nei calci piazzati' },
+  'Giovane talento': { emoji: '🌱', description: 'Giovane talento: Talento emergente con margini di crescita' },
+  'Panchinaro': { emoji: '🪑', description: 'Panchinaro: Spesso in panchina, minuti limitati' },
+  'Titolare': { emoji: '💎', description: 'Titolare: Giocatore titolare fisso nella sua squadra' },
+  'Rigorista': { emoji: '🎯', description: 'Rigorista: Specialista nei calci di rigore' },
+  'Outsider': { emoji: '🌟', description: 'Outsider: Giocatore fuori dai radar con grande potenziale' },
+  'Assistman': { emoji: '🎨', description: 'Assistman: Creatore di gioco, fornisce assist decisivi' },
+  'Falloso': { emoji: '🚫', description: 'Falloso: Giocatore soggetto a molti falli/cartellini' },
+  'Fuoriclasse': { emoji: '👑', description: 'Fuoriclasse: Giocatore di livello superiore, sempre affidabile' },
+  'Goleador': { emoji: '⚡', description: 'Goleador: Finalizzatore nato, specialista in zona gol' }
+};
+
+/**
+ * Estrae e processa le skills di un giocatore
+ */
+export const getPlayerSkills = (player) => {
+  // Prova diversi nomi di colonna possibili
+  const skillsData = player.Skills || player.skills || player.Skill || player.skill || 
+                     player.Attributi || player.attributi || player.Tags || player.tags;
+  
+  if (!skillsData) return [];
+  
+  // Debug log
+  console.log('Skills parsing:', {
+    playerName: player.Nome,
+    rawSkillsData: skillsData,
+    type: typeof skillsData
+  });
+  
+  // Se è una stringa, prova a parsare come JSON o dividere per separatori
+  if (typeof skillsData === 'string') {
+    // Prima pulisce la stringa da parentesi quadre e apici
+    let cleanedString = skillsData.trim();
+    
+    // Rimuove parentesi quadre esterne se presenti
+    if (cleanedString.startsWith('[') && cleanedString.endsWith(']')) {
+      cleanedString = cleanedString.slice(1, -1);
+    }
+    
+    try {
+      // Prova parsing JSON (aggiungendo le parentesi quadre se necessario)
+      const jsonString = cleanedString.startsWith('[') ? cleanedString : `[${cleanedString}]`;
+      const parsed = JSON.parse(jsonString);
+      return Array.isArray(parsed) ? parsed : [skillsData];
+    } catch {
+      // Se non è JSON, dividi per virgole e pulisci apici/spazi
+      return cleanedString
+        .split(/[,|;]/)
+        .map(s => s.trim().replace(/^['"]|['"]$/g, '')) // Rimuove apici all'inizio e fine
+        .filter(s => s);
+    }
+  }
+  
+  // Se è già un array, restituiscilo
+  if (Array.isArray(skillsData)) {
+    return skillsData;
+  }
+  
+  return [];
 };
 
 /**

@@ -1,6 +1,6 @@
 import React from 'react';
 import { getPlayerDetails } from '../utils/storage';
-import { getExpectedGoals, getGoalsLabel } from '../utils/dataUtils';
+import { getExpectedGoals, getGoalsLabel, getPlayerSkills, SKILLS_MAPPING } from '../utils/dataUtils';
 
 const PlayerCard = ({ 
   player, 
@@ -15,6 +15,9 @@ const PlayerCard = ({
 
   // Controlla se il giocatore è infortunato
   const isInjured = player.Infortunato === 'true';
+
+  // Skills del giocatore
+  const playerSkills = getPlayerSkills(player);
 
   const handleStatusChange = (newStatus) => {
     if (newStatus === 'acquired' && onAcquire) {
@@ -243,6 +246,23 @@ const PlayerCard = ({
     gap: '0.25rem'
   };
 
+  // Stili per le skills
+  const skillsContainerStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.25rem',
+    marginBottom: '0.75rem'
+  };
+
+  const skillItemStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    fontSize: '1rem',
+    cursor: 'help',
+    transition: 'transform 0.2s',
+    filter: 'grayscale(0.2)',
+  };
+
   const trend = player.Trend === 'UP' ? '📈 ' : player.Trend === 'DOWN' ? '📉 ' : player.Trend === 'STABLE' ? '🟰 ' : '';
 
   return (
@@ -274,6 +294,32 @@ const PlayerCard = ({
           <div style={roleStyle}>{player.Ruolo}</div>
         </div>
       </div>
+
+      {/* Skills del giocatore */}
+      {playerSkills.length > 0 && (
+        <div style={skillsContainerStyle}>
+          {playerSkills.map((skill, index) => {
+            const skillData = SKILLS_MAPPING[skill] || { emoji: '❓', description: skill };
+            return (
+              <span
+                key={index}
+                style={skillItemStyle}
+                title={skillData.description}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'scale(1.2)';
+                  e.target.style.filter = 'grayscale(0)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'scale(1)';
+                  e.target.style.filter = 'grayscale(0.2)';
+                }}
+              >
+                {skillData.emoji}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {/* Stats dinamiche - CONTROLLATE ESTERNAMENTE */}
       <div style={statsStyle}>
