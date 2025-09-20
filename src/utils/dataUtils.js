@@ -228,13 +228,6 @@ export const getPlayerSkills = (player) => {
   
   if (!skillsData) return [];
   
-  // Debug log
-  console.log('Skills parsing:', {
-    playerName: player.Nome,
-    rawSkillsData: skillsData,
-    type: typeof skillsData
-  });
-  
   // Se è una stringa, prova a parsare come JSON o dividere per separatori
   if (typeof skillsData === 'string') {
     // Prima pulisce la stringa da parentesi quadre e apici
