@@ -265,14 +265,15 @@ export const getPlayerSkills = (player) => {
  */
 export const SORT_OPTIONS = [
   { key: 'convenienza', label: 'Convenienza Potenziale', field: 'convenienza' },
-  { key: 'fantamedia', label: 'Fantamedia', field: 'fantamedia' },
+  { key: 'fantamedia', label: 'Fantamedia 2024-2025', field: 'fantamedia' },
+  { key: 'fantamedia_2023', label: 'Fantamedia 2023-2024', field: 'Fantamedia anno 2023-2024' },
   { key: 'presenze', label: 'Presenze', field: 'presenze' },
   { key: 'punteggio', label: 'Punteggio', field: 'punteggio' },
   { key: 'gol_previsti', label: 'Gol Previsti', field: 'Gol previsti', useExpectedGoals: true },
   { key: 'assist_previsti', label: 'Assist Previsti', field: 'Assist previsti' },
   { key: 'presenze_previste', label: 'Presenze Previste', field: 'Presenze previste' },
   { key: 'resistenza', label: 'Resistenza Infortuni', field: 'Resistenza infortuni' },
-  { key: 'quotazione', label: 'Quotazione', field: 'Quotazione' }
+  { key: 'fm_tot_gare', label: 'FM su Tot Gare', field: 'FM su tot gare 2024-2025' }
 ];
 
 /**
@@ -280,14 +281,13 @@ export const SORT_OPTIONS = [
  */
 export const NUMERIC_FILTER_FIELDS = [
   { key: 'convenienza', label: 'Convenienza Potenziale', field: 'convenienza', min: 0, max: 200 },
-  { key: 'fantamedia', label: 'Fantamedia', field: 'fantamedia', min: 0, max: 10 },
+  { key: 'fantamedia', label: 'Fantamedia 2024-2025', field: 'fantamedia', min: 0, max: 10 },
   { key: 'presenze', label: 'Presenze', field: 'presenze', min: 0, max: 38 },
   { key: 'punteggio', label: 'Punteggio', field: 'punteggio', min: 0, max: 100 },
   { key: 'gol_previsti', label: 'Gol Previsti', field: 'Gol previsti', min: -30, max: 30, useExpectedGoals: true },
   { key: 'assist_previsti', label: 'Assist Previsti', field: 'Assist previsti', min: 0, max: 20 },
   { key: 'presenze_previste', label: 'Presenze Previste', field: 'Presenze previste', min: 0, max: 38 },
-  { key: 'resistenza', label: 'Resistenza Infortuni', field: 'Resistenza infortuni', min: 0, max: 10 },
-  { key: 'quotazione', label: 'Quotazione', field: 'Quotazione', min: 1, max: 100 }
+  { key: 'resistenza', label: 'Resistenza Infortuni', field: 'Resistenza infortuni', min: 0, max: 100 },
 ];
 
 /**
@@ -389,6 +389,11 @@ export const applyNumericFilters = (players, filters) => {
       const filter = filters[field.key];
       if (!filter || filter.min === undefined || filter.max === undefined) return true;
       
+      // IMPORTANTE: Ignora filtri che sono ancora ai valori di default
+      if (filter.min === field.min && filter.max === field.max) {
+        return true; // Filtro non modificato dall'utente, includi tutti
+      }
+      
       let value;
       // Gestione speciale per i gol previsti
       if (field.useExpectedGoals) {
@@ -409,7 +414,22 @@ export const applyNumericFilters = (players, filters) => {
         value = parseFloat(value) || 0;
       }
       
-      return value >= filter.min && value <= filter.max;
+      // Debug log per ogni confronto (solo per filtri modificati)
+      const isInRange = value >= filter.min && value <= filter.max;
+      if (!isInRange && field.key === 'fantamedia') { // Logga solo fantamedia per non spammare
+        console.log(`❌ Filtro ${field.label}:`, {
+          player: player.Nome,
+          rawValue: player[field.field],
+          normalizedValue: player[field.key],
+          processedValue: value,
+          valueType: typeof value,
+          filterMin: filter.min,
+          filterMax: filter.max,
+          isInRange
+        });
+      }
+      
+      return isInRange;
     });
   });
 };
