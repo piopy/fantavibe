@@ -454,7 +454,6 @@ const PlayersTab = ({
               </div>
             )}
           </div>
-        )
         
         {/* Controlli di Ordinamento */}
         <div style={{
