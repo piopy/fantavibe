@@ -36,6 +36,9 @@ const PlayersTab = ({
     { key: 'ATT', label: 'Attaccanti', emoji: '⚽' }
   ];
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDetailedMode, setShowDetailedMode] = useState(false);
+
   const rolesDescription = (roleKey) => {
     const role = roles.find(r => r.key === roleKey);
     if (!role) return '';

@@ -47,8 +47,16 @@ const createSearchIndex = (players) => {
     const words = normalizedName.split(' ')
       .concat(normalizedSquadra.split(' '));
 
-    if (player.Infortunato === 'true') {
+    if (player.Infortunato === true) {
       words.push('infortunato');
+    }
+
+    if (player['Consigliato prossima giornata'] === true) {
+      words.push('consigliato');
+    }
+
+    if (player['Nuovo acquisto'] === true) {
+      words.push('nuovo');
     }
 
     // Indicizza squadra normalizzata

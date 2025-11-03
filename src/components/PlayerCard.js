@@ -14,7 +14,7 @@ const PlayerCard = ({
   const fantamilioni = playerDetails?.fantamilioni || null;
 
   // Controlla se il giocatore è infortunato
-  const isInjured = player.Infortunato === 'true';
+  const isInjured = player.Infortunato === true;
 
   // Skills del giocatore
   const playerSkills = getPlayerSkills(player);
@@ -69,6 +69,64 @@ const PlayerCard = ({
     }
   }
 
+  // Processa il campo skills
+  const processSkills = (skillsField) => {
+    if (!skillsField) return [];
+    
+    // Se è già un array, restituiscilo così com'è
+    if (Array.isArray(skillsField)) {
+      return skillsField.filter(skill => skill && skill.trim() !== '');
+    }
+    
+    if (typeof skillsField === 'string') {
+      // Se la stringa sembra un array JavaScript (inizia con [ e finisce con ])
+      if (skillsField.trim().startsWith('[') && skillsField.trim().endsWith(']')) {
+        try {
+          // Prova prima a parsare come JSON standard
+          const parsed = JSON.parse(skillsField);
+          if (Array.isArray(parsed)) {
+            return parsed.filter(skill => skill && typeof skill === 'string' && skill.trim() !== '');
+          }
+        } catch (error) {
+          // Se il JSON parsing fallisce, prova a convertire apici singoli in doppi
+          try {
+            const jsonCompatible = skillsField.replace(/'/g, '"');
+            const parsed = JSON.parse(jsonCompatible);
+            if (Array.isArray(parsed)) {
+              return parsed
+                .filter(skill => skill && typeof skill === 'string' && skill.trim() !== '')
+                .map(skill => skill.trim().toUpperCase());
+            }
+          } catch (secondError) {
+            // Se anche questo fallisce, parsing manuale sicuro
+            const content = skillsField.trim().slice(1, -1); // Rimuove [ e ]
+            if (content.trim()) {
+              return content
+                .split(',')
+                .map(item => {
+                  // Rimuove apici/virgolette e spazi
+                  return item.trim().replace(/^['"]|['"]$/g, '');
+                })
+                .filter(skill => skill && skill.trim() !== '')                
+                .map(skill => skill.trim().toUpperCase());
+            }
+          }
+        }
+      }
+      
+      // Se non è un array in formato stringa, dividi per virgola o punto e virgola
+      return skillsField
+        .split(/[,;]/)
+        .map(skill => skill.trim().toUpperCase())
+        .filter(skill => skill !== '');
+    }
+    
+    return [];
+  };
+
+  // Estrae le skills dal player object
+  const playerSkills = processSkills(player.Skills);
+
   // Statistiche base (sempre visibili)
   const baseStats = [
     { key: 'convenienza_pot', label: 'Convenienza Potenziale', value: player.convenienza?.toFixed(0) || 'N/A' },
@@ -81,7 +139,7 @@ const PlayerCard = ({
   
   const allStats = [
     ...baseStats,
-    { key: 'convenienza', label: 'Convenienza', value: player['Convenienza'].toFixed(2) || 'N/A' },
+    { key: 'convenienza', label: 'Convenienza', value: player['Convenienza']?.toFixed(2) || 'N/A' },
     { key: 'punteggio', label: 'Punteggio', value: player.punteggio || player.Punteggio || 'N/A' },
     { key: 'presenze_previste', label: 'Presenze Previste', value: player['Presenze previste'] || 'N/A' },
     { key: 'presenze', label: 'Presenze AP', value: player.presenze || player['Presenze campionato corrente'] || 'N/A' },
@@ -89,9 +147,8 @@ const PlayerCard = ({
     { key: 'assist', label: 'Assist Previsti', value: player['Assist previsti'] || 'N/A' },
     { key: 'buon_investimento', label: 'Buon Investimento', value: player['Buon investimento'] || 'N/A' },
     { key: 'resistenza', label: 'Resistenza Infortuni', value: player['Resistenza infortuni'] || 'N/A' },
-    { key: 'nuovo_acquisto', label: 'Nuovo Acquisto', value: player['Nuovo acquisto'] === 'true' ? 'SI' : 'NO' || 'N/A' },
-    { key: 'consigliato_prox', label: 'Consigliato Prossima Giornata', value: player['Consigliato prossima giornata'] === 'true'  ? 'SI' : 'NO' || 'N/A' },
-    // { key: 'partite_giocate', label: 'Partite Giocate', value: player['Partite giocate'] || 'N/A' },
+    { key: 'nuovo_acquisto', label: 'Nuovo Acquisto', value: player['Nuovo acquisto'] === true ? 'SI' : 'NO' || 'N/A' },
+    { key: 'consigliato_prox', label: 'Consigliato Prossima Giornata', value: player['Consigliato prossima giornata'] === true  ? 'SI' : 'NO' || 'N/A' },
   ];
 
   const statsToShow = showAllStats ? allStats : baseStats;
@@ -216,6 +273,43 @@ const PlayerCard = ({
     lineHeight: '1'
   };
 
+  // Stili per le skills
+  const skillsContainerStyle = {
+    marginBottom: '1rem'
+  };
+
+  const skillsLabelStyle = {
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: '0.5rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.025em'
+  };
+
+  const skillsListStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.25rem'
+  };
+
+  const skillBadgeStyle = {
+    fontSize: '0.625rem',
+    fontWeight: '500',
+    padding: '0.2rem 0.4rem',
+    borderRadius: '4px',
+    backgroundColor: '#ddd6fe',
+    color: '#5b21b6',
+    border: '1px solid #c4b5fd',
+    whiteSpace: 'nowrap'
+  };
+
+  const noSkillsStyle = {
+    fontSize: '0.7rem',
+    color: '#9ca3af',
+    fontStyle: 'italic'
+  };
+
   const fantamilioniStyle = {
     fontSize: '0.75rem',
     fontWeight: '600',
@@ -333,6 +427,28 @@ const PlayerCard = ({
         ))}
       </div>
 
+      {/* Sezione Skills - NUOVA AGGIUNTA */}
+      {playerSkills.length > 0 && (
+        <div style={skillsContainerStyle}>
+          <div style={skillsLabelStyle}>Skills</div>
+          <div style={skillsListStyle}>
+            {playerSkills.map((skill, index) => (
+              <span key={index} style={skillBadgeStyle}>
+                {skill}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Placeholder per quando non ci sono skills (solo se showAllStats è true) */}
+      {showAllStats && playerSkills.length === 0 && (
+        <div style={skillsContainerStyle}>
+          <div style={skillsLabelStyle}>Skills</div>
+          <div style={noSkillsStyle}>Nopn disponibili</div>
+        </div>
+      )}
+
       {/* Action buttons - STILE IDENTICO ALL'ORIGINALE */}
       <div style={buttonContainerStyle}>
         <button
@@ -356,7 +472,7 @@ const PlayerCard = ({
         >
           {currentStatus === 'acquired' ? '✓ Tuo' : '+ Compra'}
         </button>
-        
+
         <button
           onClick={(e) => handleButtonClick(e, 'unavailable')}
           style={{
@@ -378,7 +494,7 @@ const PlayerCard = ({
         >
           {currentStatus === 'unavailable' ? '✗ N/D' : '✗ N/D'}
         </button>
-        
+
         {(currentStatus === 'acquired' || currentStatus === 'unavailable') && (
           <button
             onClick={(e) => handleButtonClick(e, 'available')}
